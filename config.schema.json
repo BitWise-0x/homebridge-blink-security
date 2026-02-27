@@ -1,0 +1,145 @@
+{
+  "pluginAlias": "BlinkSecurity",
+  "pluginType": "platform",
+  "singular": true,
+  "strictValidation": true,
+  "headerDisplay": "Homebridge plugin for Amazon Blink security cameras",
+  "footerDisplay": "For documentation please see [GitHub](https://github.com/BitWise-0x/homebridge-blink-security)",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "default": "Blink Security",
+        "type": "string"
+      },
+      "username": {
+        "title": "Email",
+        "type": "string",
+        "format": "email"
+      },
+      "password": {
+        "title": "Password",
+        "type": "string"
+      },
+      "pin": {
+        "title": "2FA Verification Code",
+        "description": "Enter the 2FA verification code sent to your email/phone after the first auth attempt, then restart Homebridge",
+        "type": "string"
+      },
+      "hide-alarm": {
+        "title": "Hide Alarm (Security System)",
+        "placeholder": true,
+        "description": "When combined with the arm switch (used for automation), the Security System will have to be controlled by the Blink App.",
+        "type": "boolean"
+      },
+      "hide-manual-arm-switch": {
+        "title": "Hide Sync Module Arm Switch",
+        "placeholder": true,
+        "description": "The Sync Module Arm switch allows for automations to arm / disarm all cameras associated with a sync module.",
+        "type": "boolean"
+      },
+      "hide-temperature-sensor": {
+        "title": "Hide Camera Temperature Sensors",
+        "placeholder": false,
+        "type": "boolean"
+      },
+      "hide-enabled-switch": {
+        "title": "Hide Camera Motion Enabled/Disable Switch",
+        "placeholder": false,
+        "type": "boolean"
+      },
+      "hide-privacy-switch": {
+        "title": "Hide Camera Privacy-Mode Enable/Disable Switch",
+        "placeholder": false,
+        "description": "Privacy-Mode prevents thumbnails from refreshing when the Security System is not armed. Disabling this switch will globally disable privacy-mode on all cameras.",
+        "type": "boolean"
+      },
+      "enable-liveview": {
+        "title": "Enable LiveView when clicking on a camera feed (experimental)",
+        "placeholder": false,
+        "description": "By default, the camera view will expose the last recorded motion. Enabling live view will enable the experimental liveview relay.",
+        "type": "boolean"
+      },
+      "disable-thumbnail-refresh": {
+        "title": "Disable thumbnail auto-refresh",
+        "default": false,
+        "description": "By default, the thumbnails of the cameras will refresh when the camera is enabled, disabling the auto refresh keeps the default thumbnail untouched.",
+        "type": "boolean"
+      },
+      "camera-thumbnail-refresh-seconds": {
+        "title": "Camera Thumbnail Refresh (seconds)",
+        "type": "integer",
+        "minimum": 0,
+        "placeholder": "3600",
+        "description": "Force Thumbnail refresh every N seconds. If auto refresh is disabled, this value is ignored."
+      },
+      "camera-status-polling-seconds": {
+        "title": "Status Polling (seconds)",
+        "type": "integer",
+        "minimum": 1,
+        "placeholder": "30",
+        "description": "Camera status does not update live and must be fetched periodically. By default this is done every 30 seconds."
+      },
+      "camera-motion-polling-seconds": {
+        "title": "Camera Motion Polling (seconds)",
+        "type": "integer",
+        "minimum": 0,
+        "placeholder": "15",
+        "description": "Camera motion detection does not update live and must be fetched periodically. By default this is done every 15 seconds."
+      },
+      "logging": {
+        "title": "Advanced Logging",
+        "type": "string",
+        "oneOf": [
+          { "title": "Verbose", "enum": ["verbose"] },
+          { "title": "Debug", "enum": ["debug"] }
+        ]
+      },
+      "enable-startup-diagnostic": {
+        "title": "Enable Diagnostic Logging on startup",
+        "default": false,
+        "type": "boolean"
+      }
+    },
+    "required": []
+  },
+  "layout": [
+    { "key": "name", "title": "Name" },
+    {
+      "type": "section",
+      "title": "Authentication",
+      "expandable": true,
+      "expanded": true,
+      "items": ["username", "password", "pin"]
+    },
+    {
+      "type": "section",
+      "title": "Features",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "hide-alarm",
+        "hide-manual-arm-switch",
+        "hide-enabled-switch",
+        "hide-privacy-switch",
+        "disable-thumbnail-refresh",
+        "hide-temperature-sensor",
+        "enable-liveview"
+      ]
+    },
+    {
+      "type": "section",
+      "title": "Advanced Settings",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "camera-thumbnail-refresh-seconds",
+        "camera-status-polling-seconds",
+        "camera-motion-polling-seconds",
+        "logging",
+        "enable-startup-diagnostic"
+      ]
+    }
+  ]
+}

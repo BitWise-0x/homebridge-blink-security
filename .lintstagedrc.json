@@ -1,0 +1,5 @@
+{
+  "*.ts": ["bash -c tsc --noEmit", "bash -c eslint --fix", "prettier --write"],
+  "*.js": ["eslint --fix", "prettier --write"],
+  "*.@(json|md|html|yml)": ["prettier --write"]
+}

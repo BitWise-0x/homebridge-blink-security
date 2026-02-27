@@ -1,0 +1,16 @@
+{
+  "bridge": {
+    "name": "Homebridge",
+    "username": "00:00:00:00:00:00",
+    "port": 51702,
+    "pin": "000-00-000"
+  },
+  "accessories": [],
+  "platforms": [
+    {
+      "platform": "BlinkSecurity",
+      "username": "user@example.com",
+      "password": "mypassword"
+    }
+  ]
+}

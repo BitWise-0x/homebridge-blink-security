@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "module": "Node16",
+    "target": "ES2022",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "Node16",
+    "skipLibCheck": true
+  },
+  "include": ["homebridge-ui", "src/**/*.ts"],
+  "exclude": ["**/*.spec.ts"]
+}
