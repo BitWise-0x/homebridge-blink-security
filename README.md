@@ -20,7 +20,7 @@
 
 <!-- [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FBitWise-0x%2Fhomebridge-blink-security.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2FBitWise-0x%2Fhomebridge-blink-security?ref=badge_shield&issueType=security) -->
 <br>
-[Homebridge](https://homebridge.io) plugin for [Amazon Blink](https://blinkforhome.com) cameras, doorbells, and sirens — bringing your Blink devices into [Apple Home](https://www.apple.com/ios/home/) with live view, motion detection, snapshots, and arm/disarm.
+<a href="https://homebridge.io">Homebridge</a> plugin for <a href="https://blinkforhome.com">Amazon Blink</a> cameras, doorbells, and sirens — bringing your Blink devices into <a href="https://www.apple.com/ios/home/">Apple Home</a> with live view, motion detection, snapshots, and arm/disarm.
 
 </span>
 <br><br>
