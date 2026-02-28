@@ -56,9 +56,9 @@
         "type": "boolean"
       },
       "enable-liveview": {
-        "title": "Enable LiveView when clicking on a camera feed (experimental)",
-        "placeholder": false,
-        "description": "By default, the camera view will expose the last recorded motion. Enabling live view will enable the experimental liveview relay.",
+        "title": "Enable LiveView when clicking on a camera feed",
+        "default": true,
+        "description": "When enabled, clicking a camera feed will start a live stream relay. When disabled, only the last recorded thumbnail is shown.",
         "type": "boolean"
       },
       "disable-thumbnail-refresh": {
