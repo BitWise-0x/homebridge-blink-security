@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.0.3...v1.0.4) (2026-03-01)
+
+### Bug Fixes
+
+* refresh thumbnail after live stream ends ([6b9f401](https://github.com/BitWise-0x/homebridge-blink-security/commit/6b9f40168b3bccba40bbf48a116d0073710d1449))
+
 ## [1.0.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.0.2...v1.0.3) (2026-03-01)
 
 ### Bug Fixes
