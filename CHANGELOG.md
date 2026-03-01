@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file. See
 
 * mark username and password as required in config schema ([f33e837](https://github.com/BitWise-0x/homebridge-blink-security/commit/f33e8374ecfdbed3100fce0a78c6efd7915e5c17))
 
+## [1.0.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.0.2...v1.0.3) (2026-03-01)
+
+### Bug Fixes
+
+* mark username and password as required in config schema ([f33e837](https://github.com/BitWise-0x/homebridge-blink-security/commit/f33e8374ecfdbed3100fce0a78c6efd7915e5c17))
+
 ## [1.0.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.0.1...v1.0.2) (2026-02-28)
 
 ### Bug Fixes
