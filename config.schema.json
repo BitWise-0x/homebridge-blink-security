@@ -102,7 +102,7 @@
         "type": "boolean"
       }
     },
-    "required": []
+    "required": ["username", "password"]
   },
   "layout": [
     { "key": "name", "title": "Name" },
