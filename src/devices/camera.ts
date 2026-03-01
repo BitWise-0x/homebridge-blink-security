@@ -261,6 +261,10 @@ export class BlinkCamera extends BlinkDevice {
     return data;
   }
 
+  clearThumbnailCache(): void {
+    this.cacheThumbnail.clear();
+  }
+
   async getLiveViewURL(timeout = 30): Promise<string | undefined> {
     const data = await this.blink.getCameraLiveView(
       this.networkID,

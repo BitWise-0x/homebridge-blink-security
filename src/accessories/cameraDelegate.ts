@@ -445,6 +445,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       this.streamTimeouts.delete(sessionID);
     }
 
+    // Check if this was a real live view before cleanup deletes the session
+    const hadLiveView = this.proxySessions.get(sessionID)?.proxyServer != null;
+
     // Clean up temp snapshot file if it exists
     const tmpPath = join(tmpdir(), `blink-snapshot-${sessionID}.jpg`);
     unlink(tmpPath).catch(() => {});
@@ -470,6 +473,27 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         );
       }
       this.ongoingSessions.delete(sessionID);
+    }
+
+    // After a real live view, request a fresh thumbnail so the Home app
+    // shows a recent image instead of a stale one.
+    // Skip for: image-fallback streams, battery cameras on disarmed networks,
+    // and if a forced refresh already happened recently (avoid 409s).
+    const shouldRefresh =
+      hadLiveView &&
+      (!this.blinkCamera.isBatteryPower || this.blinkCamera.armed) &&
+      Date.now() - this.lastForcedRefresh > 300_000;
+
+    if (shouldRefresh) {
+      this.lastForcedRefresh = Date.now();
+      this.blinkCamera
+        .refreshThumbnail(true)
+        .then(() => this.blinkCamera.clearThumbnailCache())
+        .catch(e =>
+          this.log.debug(
+            `${this.blinkCamera.name} - Post-stream thumbnail refresh failed: ${e}`
+          )
+        );
     }
   }
 
