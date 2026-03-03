@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.1...v1.1.2) (2026-03-03)
+
+### Bug Fixes
+
+* use TCP transport for RTSP streams ([eaff233](https://github.com/BitWise-0x/homebridge-blink-security/commit/eaff233ca7c2b8c919607139758311740a3aa35a))
+
 ## [1.1.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.0...v1.1.1) (2026-03-03)
 
 ### Bug Fixes
