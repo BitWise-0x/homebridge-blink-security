@@ -29,7 +29,7 @@ const {
 const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
-import { Http2TLSTunnel, ImmiTunnel } from '../lib/proxy.js';
+import { ImmiTunnel } from '../lib/proxy.js';
 
 interface SessionInfo {
   address: string;
@@ -48,8 +48,9 @@ interface ProxySession {
   protocol?: string;
   host?: string;
   listenPort?: number;
-  proxyServer?: Http2TLSTunnel | ImmiTunnel;
+  proxyServer?: ImmiTunnel;
   isImmi?: boolean;
+  isRtsp?: boolean;
 }
 
 export class BlinkCameraDelegate implements CameraStreamingDelegate {
@@ -211,21 +212,11 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         proxyServer,
         isImmi: true,
       });
-    } else if (liveViewURL?.startsWith('rtsp') && urlRegex.test(liveViewURL)) {
-      // RTSP protocol — TLS tunnel
-      const [, protocol, host, path] = urlRegex.exec(liveViewURL)!;
-      const [listenPort] = await reservePorts({ count: 1 });
-      const proxyServer = await this.createTLSTunnel(
-        listenPort,
-        host,
-        protocol
-      );
+    } else if (liveViewURL?.startsWith('rtsp')) {
+      // RTSP/RTSPS — pass URL directly to ffmpeg (native TLS support)
       this.proxySessions.set(request.sessionID, {
-        protocol,
-        host,
-        path,
-        listenPort,
-        proxyServer,
+        path: liveViewURL,
+        isRtsp: true,
       });
     } else if (liveViewURL) {
       this.proxySessions.set(request.sessionID, { path: liveViewURL });
@@ -278,7 +269,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const rtspProxy = this.proxySessions.get(sessionID);
 
     // No valid video source — can't start stream
-    if (!rtspProxy?.proxyServer && !rtspProxy?.path) {
+    if (!rtspProxy?.proxyServer && !rtspProxy?.path && !rtspProxy?.isRtsp) {
       this.log.warn(
         `${this.blinkCamera.name} - No video source available, cannot start stream`
       );
@@ -300,7 +291,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const ffmpegArgs: string[] = [];
 
     // Whether this source has audio (live streams do, static fallback doesn't)
-    const hasAudio = !!rtspProxy?.proxyServer;
+    const hasAudio = !!rtspProxy?.proxyServer || !!rtspProxy?.isRtsp;
 
     if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
       // IMMI protocol — MPEG-TS input from local tunnel
@@ -327,8 +318,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-sn',
         '-dn'
       );
-    } else if (rtspProxy?.proxyServer) {
-      // RTSP protocol — copy codec
+    } else if (rtspProxy?.isRtsp && rtspProxy.path) {
+      // RTSP/RTSPS — direct connection (ffmpeg handles TLS natively)
       ffmpegArgs.push(
         '-hide_banner',
         '-loglevel',
@@ -338,7 +329,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-user_agent',
         'Immedia WalnutPlayer',
         '-i',
-        `rtsp://localhost:${rtspProxy.listenPort}${rtspProxy.path}`,
+        rtspProxy.path,
         '-map',
         '0:v',
         '-vcodec',
@@ -512,7 +503,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     }
 
     // Check if this was a real live view before cleanup deletes the session
-    const hadLiveView = this.proxySessions.get(sessionID)?.proxyServer != null;
+    const session = this.proxySessions.get(sessionID);
+    const hadLiveView =
+      session?.proxyServer != null || session?.isRtsp === true;
 
     // Clean up temp snapshot file if it exists
     const tmpPath = join(tmpdir(), `blink-snapshot-${sessionID}.jpg`);
@@ -561,22 +554,6 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
           )
         );
     }
-  }
-
-  private async createTLSTunnel(
-    listenPort: number,
-    targetHost: string,
-    protocol: string
-  ): Promise<Http2TLSTunnel> {
-    const proxyServer = new Http2TLSTunnel(
-      listenPort,
-      targetHost,
-      '0.0.0.0',
-      443,
-      protocol
-    );
-    await proxyServer.start();
-    return proxyServer;
   }
 
   private async createImmiTunnel(
