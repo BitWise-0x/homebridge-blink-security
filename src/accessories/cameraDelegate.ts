@@ -333,6 +333,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-hide_banner',
         '-loglevel',
         'warning',
+        '-user_agent',
+        'Immedia WalnutPlayer',
         '-i',
         `rtsp://localhost:${rtspProxy.listenPort}${rtspProxy.path}`,
         '-map',
@@ -340,9 +342,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-vcodec',
         'copy',
         '-sn',
-        '-dn',
-        '-user-agent',
-        'Immedia WalnutPlayer'
+        '-dn'
       );
     } else {
       ffmpegArgs.push(
