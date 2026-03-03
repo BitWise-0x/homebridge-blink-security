@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.0...v1.1.1) (2026-03-03)
+
+### Bug Fixes
+
+* move RTSP user_agent before -i input flag ([6bf1319](https://github.com/BitWise-0x/homebridge-blink-security/commit/6bf13196c0454f2f66a0265da8242eac6d4990c0))
+
 ## [1.1.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.0.4...v1.1.0) (2026-03-03)
 
 ### Features
