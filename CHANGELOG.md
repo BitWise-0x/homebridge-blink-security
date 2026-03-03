@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.5...v1.1.6) (2026-03-03)
+
+### Bug Fixes
+
+* use CSeq-correcting TLS proxy for RTSP live view streams ([331ddb1](https://github.com/BitWise-0x/homebridge-blink-security/commit/331ddb1606c901d8455a304fa037a9a545429c5b))
+
 ## [1.1.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.4...v1.1.5) (2026-03-03)
 
 ### Bug Fixes
