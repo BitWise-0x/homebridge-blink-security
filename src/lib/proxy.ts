@@ -3,82 +3,211 @@ import tls from 'tls';
 import { Transform, TransformCallback } from 'stream';
 import type { Logger } from 'homebridge';
 
-export class Http2TLSTunnel {
+// Shared state between the CSeq tracker and fixer transforms
+interface CSeqState {
+  expectedCSeq: number;
+}
+
+/**
+ * CSeqTracker: Observes RTSP requests from ffmpeg (client → server) and
+ * records the CSeq value. Passes all data through unchanged.
+ */
+class CSeqTracker extends Transform {
+  private _textBuf = '';
+  private readonly _state: CSeqState;
+
+  constructor(state: CSeqState) {
+    super();
+    this._state = state;
+  }
+
+  override _transform(
+    chunk: Buffer,
+    _encoding: string,
+    done: TransformCallback
+  ): void {
+    this.push(chunk);
+
+    this._textBuf += chunk.toString('ascii');
+    const match = this._textBuf.match(/CSeq:\s*(\d+)/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num)) {
+        this._state.expectedCSeq = num;
+      }
+    }
+
+    // Prevent unbounded memory growth — only need the tail
+    if (this._textBuf.length > 512) {
+      this._textBuf = this._textBuf.slice(-256);
+    }
+
+    done();
+  }
+}
+
+/**
+ * CSeqFixer: Rewrites the CSeq header in RTSP responses from the Blink
+ * server to match the value ffmpeg expects. Correctly handles interleaved
+ * RTP frames ($ prefix) by passing them through untouched.
+ *
+ * Blink XT cameras always respond with CSeq: 1 regardless of the request,
+ * which causes ffmpeg to discard SETUP/PLAY responses and fail.
+ */
+class CSeqFixer extends Transform {
+  private _buf: Buffer = Buffer.alloc(0);
+  private _bodyRemaining = 0;
+  private readonly _state: CSeqState;
+
+  constructor(state: CSeqState) {
+    super();
+    this._state = state;
+  }
+
+  override _transform(
+    chunk: Buffer,
+    _encoding: string,
+    done: TransformCallback
+  ): void {
+    this._buf = this._buf.length
+      ? (Buffer.concat([this._buf, chunk]) as Buffer)
+      : chunk;
+
+    while (this._buf.length > 0) {
+      // Forward response body bytes (e.g. SDP after DESCRIBE)
+      if (this._bodyRemaining > 0) {
+        const toConsume = Math.min(this._bodyRemaining, this._buf.length);
+        this.push(this._buf.subarray(0, toConsume));
+        this._buf = this._buf.subarray(toConsume);
+        this._bodyRemaining -= toConsume;
+        continue;
+      }
+
+      const firstByte = this._buf[0];
+
+      if (firstByte === 0x24) {
+        // Interleaved RTP frame: $ (1) + channel (1) + length (2 BE) + payload
+        if (this._buf.length < 4) break;
+        const frameLen = 4 + this._buf.readUInt16BE(2);
+        if (this._buf.length < frameLen) break;
+        this.push(this._buf.subarray(0, frameLen));
+        this._buf = this._buf.subarray(frameLen);
+      } else {
+        // RTSP text response — buffer until end of headers
+        const headerEnd = this._buf.indexOf('\r\n\r\n');
+        if (headerEnd === -1) break;
+
+        const headerBlock = this._buf.subarray(0, headerEnd + 4);
+        this._buf = this._buf.subarray(headerEnd + 4);
+
+        // Rewrite CSeq to match what ffmpeg expects
+        let headerStr = headerBlock.toString('ascii');
+        if (this._state.expectedCSeq > 0) {
+          headerStr = headerStr.replace(
+            /^CSeq:\s*\d+/im,
+            `CSeq: ${this._state.expectedCSeq}`
+          );
+        }
+
+        this.push(Buffer.from(headerStr, 'ascii'));
+
+        // Check for Content-Length body (e.g. SDP in DESCRIBE response)
+        const clMatch = headerStr.match(/Content-Length:\s*(\d+)/i);
+        if (clMatch) {
+          this._bodyRemaining = parseInt(clMatch[1], 10);
+        }
+      }
+    }
+
+    done();
+  }
+
+  override _flush(done: TransformCallback): void {
+    if (this._buf.length > 0) {
+      this.push(this._buf);
+    }
+    done();
+  }
+}
+
+/**
+ * TLS-terminating proxy for RTSP streams with CSeq correction.
+ *
+ * ffmpeg connects to localhost:PORT over plain TCP. The proxy establishes
+ * a TLS connection to the Blink RTSPS server and pipes data bidirectionally,
+ * fixing the CSeq header in server responses so ffmpeg accepts them.
+ */
+export class RtspTlsProxy {
   private readonly _listenHost: string;
   private readonly _listenPort: number;
   private readonly _targetHost: string;
   private readonly _tlsPort: number;
-  private readonly _protocol: string;
+  private readonly _log?: Logger;
   private _server?: net.Server;
-  private tcpSocket?: net.Socket;
-  private tlsSocket?: tls.TLSSocket;
+  private _tcpSocket?: net.Socket;
+  private _tlsSocket?: tls.TLSSocket;
 
   constructor(
     listenPort: number,
-    tlsHost: string,
+    targetHost: string,
     listenHost = '0.0.0.0',
     tlsPort = 443,
-    protocol = 'rtsp'
+    log?: Logger
   ) {
     this._listenHost = listenHost;
     this._listenPort = listenPort;
-    this._targetHost = tlsHost;
+    this._targetHost = targetHost;
     this._tlsPort = tlsPort;
-    this._protocol = protocol;
+    this._log = log;
   }
 
   get listenPort(): number {
     return this._listenPort;
   }
 
-  get targetHost(): string {
-    return this._targetHost;
-  }
-
-  get listenHost(): string {
-    return this._listenHost;
-  }
-
-  get server(): net.Server | undefined {
-    return this._server;
-  }
-
   async start(): Promise<net.Server | undefined> {
-    if (this.server?.listening) {
-      return this.server;
+    if (this._server?.listening) {
+      return this._server;
     }
 
-    if (this.tlsSocket) {
-      try {
-        this.tlsSocket.end();
-      } catch {
-        // continue regardless of error
-      }
-    }
+    this._server = net.createServer(tcpSocket => {
+      this._tcpSocket = tcpSocket;
 
-    const connectionListener = (tcpSocket: net.Socket) => {
-      this.tcpSocket = tcpSocket;
-
-      const tlsOptions: tls.ConnectionOptions = {
+      const tlsSocket = tls.connect({
         host: this._targetHost,
-        rejectUnauthorized: false,
         port: this._tlsPort,
+        rejectUnauthorized: false,
         checkServerIdentity: () => undefined,
-      };
-
-      const tlsSocket = tls.connect(tlsOptions);
-      tlsSocket.on('secureConnect', () => {
-        tcpSocket.pipe(tlsSocket);
-        tlsSocket.pipe(tcpSocket);
       });
 
-      tlsSocket.on('error', () => {
-        tcpSocket.write('HTTP/1.1 503 service unavailable\r\n\r\n');
-        tcpSocket.end();
+      tlsSocket.on('secureConnect', () => {
+        this._tlsSocket = tlsSocket;
+
+        const state: CSeqState = { expectedCSeq: 0 };
+        const tracker = new CSeqTracker(state);
+        const fixer = new CSeqFixer(state);
+
+        // ffmpeg → CSeqTracker (observe CSeq) → Blink server
+        tcpSocket.pipe(tracker).pipe(tlsSocket);
+        // Blink server → CSeqFixer (rewrite CSeq) → ffmpeg
+        tlsSocket.pipe(fixer).pipe(tcpSocket);
+      });
+
+      tlsSocket.on('error', err => {
+        this._log?.debug(`RTSP TLS error: ${err.message}`);
+        try {
+          tcpSocket.end();
+        } catch {
+          // ignore
+        }
       });
 
       tcpSocket.on('error', () => {
-        tlsSocket.end();
+        try {
+          tlsSocket.end();
+        } catch {
+          // ignore
+        }
       });
 
       tlsSocket.on('close', () => {
@@ -88,11 +217,7 @@ export class Http2TLSTunnel {
           // ignore
         }
       });
-
-      this.tlsSocket = tlsSocket;
-    };
-
-    this._server = net.createServer(connectionListener);
+    });
 
     return new Promise(resolve => {
       this._server!.listen(this._listenPort, this._listenHost, () => {
@@ -102,16 +227,16 @@ export class Http2TLSTunnel {
   }
 
   async stop(): Promise<void> {
-    if (this.tcpSocket) {
+    if (this._tcpSocket) {
       try {
-        this.tcpSocket.end();
+        this._tcpSocket.end();
       } catch {
         // ignore
       }
     }
-    if (this.tlsSocket) {
+    if (this._tlsSocket) {
       try {
-        this.tlsSocket.end();
+        this._tlsSocket.end();
       } catch {
         // ignore
       }

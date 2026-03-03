@@ -29,7 +29,7 @@ const {
 const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
-import { ImmiTunnel } from '../lib/proxy.js';
+import { ImmiTunnel, RtspTlsProxy } from '../lib/proxy.js';
 
 interface SessionInfo {
   address: string;
@@ -48,7 +48,7 @@ interface ProxySession {
   protocol?: string;
   host?: string;
   listenPort?: number;
-  proxyServer?: ImmiTunnel;
+  proxyServer?: ImmiTunnel | RtspTlsProxy;
   isImmi?: boolean;
   isRtsp?: boolean;
 }
@@ -212,10 +212,24 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         proxyServer,
         isImmi: true,
       });
-    } else if (liveViewURL?.startsWith('rtsp')) {
-      // RTSP/RTSPS — pass URL directly to ffmpeg (native TLS support)
+    } else if (liveViewURL?.startsWith('rtsp') && urlRegex.test(liveViewURL)) {
+      // RTSP/RTSPS — TLS proxy with CSeq fix for non-compliant Blink servers
+      const [, protocol, host, path] = urlRegex.exec(liveViewURL)!;
+      const [listenPort] = await reservePorts({ count: 1 });
+      const proxyServer = new RtspTlsProxy(
+        listenPort,
+        host,
+        '0.0.0.0',
+        443,
+        this.log
+      );
+      await proxyServer.start();
       this.proxySessions.set(request.sessionID, {
-        path: liveViewURL,
+        protocol,
+        host,
+        path,
+        listenPort,
+        proxyServer,
         isRtsp: true,
       });
     } else if (liveViewURL) {
@@ -269,7 +283,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const rtspProxy = this.proxySessions.get(sessionID);
 
     // No valid video source — can't start stream
-    if (!rtspProxy?.proxyServer && !rtspProxy?.path && !rtspProxy?.isRtsp) {
+    if (!rtspProxy?.proxyServer && !rtspProxy?.path) {
       this.log.warn(
         `${this.blinkCamera.name} - No video source available, cannot start stream`
       );
@@ -291,7 +305,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const ffmpegArgs: string[] = [];
 
     // Whether this source has audio (live streams do, static fallback doesn't)
-    const hasAudio = !!rtspProxy?.proxyServer || !!rtspProxy?.isRtsp;
+    const hasAudio = !!rtspProxy?.proxyServer;
 
     if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
       // IMMI protocol — MPEG-TS input from local tunnel
@@ -318,8 +332,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-sn',
         '-dn'
       );
-    } else if (rtspProxy?.isRtsp && rtspProxy.path) {
-      // RTSP/RTSPS — direct connection (ffmpeg handles TLS natively)
+    } else if (rtspProxy?.isRtsp && rtspProxy.proxyServer) {
+      // RTSP via TLS proxy with CSeq fix
       ffmpegArgs.push(
         '-hide_banner',
         '-loglevel',
@@ -329,7 +343,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-user_agent',
         'Immedia WalnutPlayer',
         '-i',
-        rtspProxy.path,
+        `rtsp://localhost:${rtspProxy.listenPort}${rtspProxy.path}`,
         '-map',
         '0:v',
         '-vcodec',
@@ -504,8 +518,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     // Check if this was a real live view before cleanup deletes the session
     const session = this.proxySessions.get(sessionID);
-    const hadLiveView =
-      session?.proxyServer != null || session?.isRtsp === true;
+    const hadLiveView = session?.proxyServer != null;
 
     // Clean up temp snapshot file if it exists
     const tmpPath = join(tmpdir(), `blink-snapshot-${sessionID}.jpg`);
