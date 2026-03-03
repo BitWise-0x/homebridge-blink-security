@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.3...v1.1.4) (2026-03-03)
+
+### Bug Fixes
+
+* remove RTSP response rewriting that corrupted stream negotiation ([f44d07d](https://github.com/BitWise-0x/homebridge-blink-security/commit/f44d07d851f1251d4f2f6c1df2443076fdaf2986))
+
 ## [1.1.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.2...v1.1.3) (2026-03-03)
 
 ### Bug Fixes
