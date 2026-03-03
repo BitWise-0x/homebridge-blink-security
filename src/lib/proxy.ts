@@ -56,56 +56,6 @@ export class Http2TLSTunnel {
       }
     }
 
-    const host = this._targetHost;
-    const protocol = this._protocol;
-
-    const INTERLEAVED_PREFIX = 0x24; // '$'
-
-    const prepender = new Transform({
-      transform(chunk: Buffer, _encoding: string, done: TransformCallback) {
-        const self = this as Transform & { _rest?: Buffer };
-        self._rest = self._rest?.length
-          ? Buffer.concat([self._rest, chunk])
-          : chunk;
-
-        while (self._rest.length > 0) {
-          if (self._rest[0] === INTERLEAVED_PREFIX) {
-            // RTP interleaved frame: $ + channel(1) + length(2 BE) + payload
-            if (self._rest.length < 4) break;
-            const frameLen = 4 + self._rest.readUInt16BE(2);
-            if (self._rest.length < frameLen) break;
-            self.push(self._rest.subarray(0, frameLen));
-            self._rest = self._rest.subarray(frameLen);
-          } else {
-            // RTSP text — rewrite localhost references
-            const index = self._rest.indexOf('\n');
-            if (index === -1) break;
-            const lineEnd = index + 1;
-            const line = self._rest
-              .subarray(0, lineEnd)
-              .toString()
-              .replace(
-                /[a-zA-Z]{3,6}:\/\/localhost:\d+/,
-                `${protocol}://${host}:443`
-              )
-              .replace('localhost', host);
-            self._rest = self._rest.subarray(lineEnd);
-            self.push(Buffer.from(line));
-          }
-        }
-
-        return void done();
-      },
-
-      flush(done: TransformCallback) {
-        const self = this as Transform & { _rest?: Buffer };
-        if (self._rest?.length) {
-          return void done(null, self._rest);
-        }
-        done();
-      },
-    });
-
     const connectionListener = (tcpSocket: net.Socket) => {
       this.tcpSocket = tcpSocket;
 
@@ -118,14 +68,8 @@ export class Http2TLSTunnel {
 
       const tlsSocket = tls.connect(tlsOptions);
       tlsSocket.on('secureConnect', () => {
-        // Forward FFmpeg requests to Blink server as-is
         tcpSocket.pipe(tlsSocket);
-        // Rewrite Blink responses (replace localhost with actual host)
-        if (protocol) {
-          tlsSocket.pipe(prepender).pipe(tcpSocket);
-        } else {
-          tlsSocket.pipe(tcpSocket);
-        }
+        tlsSocket.pipe(tcpSocket);
       });
 
       tlsSocket.on('error', () => {
