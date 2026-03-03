@@ -333,6 +333,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-hide_banner',
         '-loglevel',
         'warning',
+        '-rtsp_transport',
+        'tcp',
         '-user_agent',
         'Immedia WalnutPlayer',
         '-i',
