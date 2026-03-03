@@ -15,6 +15,7 @@ import {
   type StreamingRequest,
   type StreamRequestCallback,
   StreamRequestTypes,
+  type AudioInfo,
   type VideoInfo,
 } from 'homebridge';
 
@@ -36,6 +37,10 @@ interface SessionInfo {
   videoCryptoSuite: number;
   videoSRTP: Buffer;
   videoSSRC: number;
+  audioPort: number;
+  audioCryptoSuite: number;
+  audioSRTP: Buffer;
+  audioSSRC: number;
 }
 
 interface ProxySession {
@@ -130,6 +135,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         request.video.srtp_salt,
       ]),
       videoSSRC,
+      audioPort: request.audio.port,
+      audioCryptoSuite: request.audio.srtpCryptoSuite,
+      audioSRTP: Buffer.concat([
+        request.audio.srtp_key,
+        request.audio.srtp_salt,
+      ]),
+      audioSSRC,
     };
 
     const response: PrepareStreamResponse = {
@@ -246,7 +258,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     this.log.debug(`${this.blinkCamera.name} - handleStreamRequest()`);
 
     if (request.type === StreamRequestTypes.START) {
-      await this.startStream(request.sessionID, request.video);
+      await this.startStream(request.sessionID, request.video, request.audio);
     } else if (request.type === StreamRequestTypes.STOP) {
       await this.stopStream(request.sessionID);
     }
@@ -255,7 +267,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
   private async startStream(
     sessionID: string,
-    video: VideoInfo
+    video: VideoInfo,
+    audio: AudioInfo
   ): Promise<void> {
     const sessionInfo = this.pendingSessions.get(sessionID);
     if (!sessionInfo) {
@@ -286,6 +299,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     const ffmpegArgs: string[] = [];
 
+    // Whether this source has audio (live streams do, static fallback doesn't)
+    const hasAudio = !!rtspProxy?.proxyServer;
+
     if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
       // IMMI protocol — MPEG-TS input from local tunnel
       ffmpegArgs.push(
@@ -295,7 +311,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-analyzeduration',
         '0',
         '-probesize',
-        '32768',
+        '131072',
         '-fflags',
         '+nobuffer',
         '-flags',
@@ -308,7 +324,6 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '0:v',
         '-vcodec',
         'copy',
-        '-an',
         '-sn',
         '-dn'
       );
@@ -321,9 +336,11 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-i',
         `rtsp://localhost:${rtspProxy.listenPort}${rtspProxy.path}`,
         '-map',
-        '0:0',
+        '0:v',
         '-vcodec',
         'copy',
+        '-sn',
+        '-dn',
         '-user-agent',
         'Immedia WalnutPlayer'
       );
@@ -388,6 +405,53 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     ffmpegArgs.push(
       `${targetProtocol}://${address}:${videoPort}?rtcpport=${videoPort}&localrtcpport=${videoPort}&pkt_size=${video.mtu}`
     );
+
+    // Audio output — transcode AAC from camera to OPUS for HomeKit
+    if (hasAudio) {
+      const audioSRTP = sessionInfo.audioSRTP.toString('base64');
+      const audioPort = sessionInfo.audioPort;
+
+      ffmpegArgs.push(
+        '-map',
+        '0:a:0',
+        '-codec:a',
+        'libopus',
+        '-application',
+        'lowdelay',
+        '-flags',
+        '+global_header',
+        '-ar',
+        `${audio.sample_rate}k`,
+        '-b:a',
+        `${audio.max_bit_rate}k`,
+        '-ac',
+        String(audio.channel),
+        '-payload_type',
+        String(audio.pt),
+        '-f',
+        'rtp'
+      );
+
+      let audioProtocol = 'rtp';
+      if (
+        sessionInfo.audioCryptoSuite ===
+        this.hap.SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80
+      ) {
+        ffmpegArgs.push(
+          '-ssrc',
+          String(sessionInfo.audioSSRC),
+          '-srtp_out_suite',
+          'AES_CM_128_HMAC_SHA1_80',
+          '-srtp_out_params',
+          audioSRTP
+        );
+        audioProtocol = 'srtp';
+      }
+
+      ffmpegArgs.push(
+        `${audioProtocol}://${address}:${audioPort}?rtcpport=${audioPort}&localrtcpport=${audioPort}&pkt_size=188`
+      );
+    }
 
     this.log.debug(`${this.blinkCamera.name} - ffmpeg ${ffmpegArgs.join(' ')}`);
 

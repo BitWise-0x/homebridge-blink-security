@@ -13,6 +13,7 @@ import { BlinkNetwork, type NetworkData } from './network.js';
 import { BlinkCamera } from './camera.js';
 import { BlinkDoorbell } from './doorbell.js';
 import { BlinkSiren } from './siren.js';
+import { ExponentialBackoff } from '../lib/utils.js';
 
 export { BlinkDevice } from './base.js';
 export { BlinkNetwork } from './network.js';
@@ -348,6 +349,7 @@ export class Blink {
       : () => this.api.getCameraLiveView(networkID, cameraID);
 
     const start = Date.now();
+    const backoff = new ExponentialBackoff(1000, 10000, 2);
     let response = await fn();
 
     // Retry on "busy" (409) just like command() does
@@ -356,8 +358,11 @@ export class Blink {
       /busy/i.test(response.message) &&
       Date.now() - start < timeout * 1000
     ) {
-      this.log.info(`Sleeping 5s: ${response.message}`);
-      await new Promise(r => setTimeout(r, 5000));
+      const delayMs = backoff.delayMs;
+      this.log.info(
+        `Sleeping ${Math.round(delayMs / 1000)}s: ${response.message}`
+      );
+      await backoff.wait();
       response = await fn();
     }
 
@@ -372,6 +377,7 @@ export class Blink {
     const fn = () => this.api.getDoorbellLiveView(networkID, doorbellID);
 
     const start = Date.now();
+    const backoff = new ExponentialBackoff(1000, 10000, 2);
     let response = await fn();
 
     while (
@@ -379,8 +385,11 @@ export class Blink {
       /busy/i.test(response.message) &&
       Date.now() - start < timeout * 1000
     ) {
-      this.log.info(`Sleeping 5s: ${response.message}`);
-      await new Promise(r => setTimeout(r, 5000));
+      const delayMs = backoff.delayMs;
+      this.log.info(
+        `Sleeping ${Math.round(delayMs / 1000)}s: ${response.message}`
+      );
+      await backoff.wait();
       response = await fn();
     }
 

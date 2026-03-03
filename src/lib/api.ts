@@ -2,7 +2,7 @@ import { Logger } from 'homebridge';
 
 import { BlinkClient } from './client.js';
 import type { BlinkAuthClient } from './auth.js';
-import { sleep } from './utils.js';
+import { ExponentialBackoff, sleep } from './utils.js';
 
 export class BlinkApi {
   readonly client: BlinkClient;
@@ -106,7 +106,8 @@ export class BlinkApi {
     cameraID: number
   ): Promise<LiveViewResponse> {
     return this.client.post<LiveViewResponse>(
-      `/api/v1/accounts/{accountID}/networks/${networkID}/cameras/${cameraID}/liveview`
+      `/api/v5/accounts/{accountID}/networks/${networkID}/cameras/${cameraID}/liveview`,
+      { intent: 'liveview', motion_event_start_time: '' }
     );
   }
 
@@ -385,10 +386,10 @@ export class BlinkApi {
   async command(
     networkID: number,
     fn: () => Promise<CommandResponse>,
-    timeout = 60,
-    busyWait = 5
+    timeout = 60
   ): Promise<CommandStatusResponse | undefined> {
     const start = Date.now();
+    const backoff = new ExponentialBackoff(1000, 10000, 2);
 
     const tryCmd = async (): Promise<CommandResponse> => {
       try {
@@ -411,8 +412,9 @@ export class BlinkApi {
       return undefined;
     }
     while (cmd.message && /busy/i.test(cmd.message)) {
-      this.log.info(`Sleeping ${busyWait}s: ${cmd.message}`);
-      await sleep(busyWait * 1000);
+      const delayMs = backoff.delayMs;
+      this.log.info(`Sleeping ${Math.round(delayMs / 1000)}s: ${cmd.message}`);
+      await backoff.wait();
       if (Date.now() - start > timeout * 1000) {
         return undefined;
       }
