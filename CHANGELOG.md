@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.0.4...v1.1.0) (2026-03-03)
+
+### Features
+
+* add audio streaming, fix XT liveview, improve retry timing ([da264a1](https://github.com/BitWise-0x/homebridge-blink-security/commit/da264a1f45582467b759b71386840481f4f4aacb))
+
 ## [1.0.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.0.3...v1.0.4) (2026-03-01)
 
 ### Bug Fixes
