@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.4...v1.1.5) (2026-03-03)
+
+### Bug Fixes
+
+* pass RTSPS URL directly to ffmpeg instead of TLS proxy ([86db4e8](https://github.com/BitWise-0x/homebridge-blink-security/commit/86db4e8c00b47dfb48bd184761fc5dedf4771cbd))
+
 ## [1.1.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.3...v1.1.4) (2026-03-03)
 
 ### Bug Fixes
