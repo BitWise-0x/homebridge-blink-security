@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.6...v1.1.7) (2026-03-03)
+
+### Bug Fixes
+
+* correct CSeq tracking and TLS race condition in RTSP proxy ([dd2a31c](https://github.com/BitWise-0x/homebridge-blink-security/commit/dd2a31cc3cfc8f632e56aedb7943091903926c14))
+
 ## [1.1.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.5...v1.1.6) (2026-03-03)
 
 ### Bug Fixes
