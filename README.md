@@ -10,13 +10,13 @@
 
 <!-- [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) -->
 
-[![npm version](https://badgen.net/npm/v/@jackietreeh0rn/homebridge-blink-security?color=purple&icon=npm&label)](https://www.npmjs.com/package/@jackietreeh0rn/homebridge-blink-security)
-[![npm downloads](https://badgen.net/npm/dw/@jackietreeh0rn/homebridge-blink-security?color=purple&icon=npm&label)](https://www.npmjs.com/package/@jackietreeh0rn/homebridge-blink-security)
-[![GitHub Stars](https://badgen.net/github/stars/BitWise-0x/homebridge-blink-security?color=cyan&icon=github)](https://github.com/BitWise-0x/homebridge-blink-security)
-[![GitHub Last Commit](https://badgen.net/github/last-commit/BitWise-0x/homebridge-blink-security?color=cyan&icon=github)](https://github.com/BitWise-0x/homebridge-blink-security)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/BitWise-0x/homebridge-blink-security.svg)](https://github.com/BitWise-0x/homebridge-blink-security/pulls)
-[![GitHub issues](https://img.shields.io/github/issues/BitWise-0x/homebridge-blink-security.svg)](https://github.com/BitWise-0x/homebridge-blink-security/issues)
-[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security.svg?type=shield&issueType=license)](https://app.fossa.com/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security?ref=badge_shield&issueType=license)
+[![npm version](https://badgen.net/npm/v/@jackietreeh0rn/homebridge-blink-security?color=purple&icon=npm&label&v=2)](https://www.npmjs.com/package/@jackietreeh0rn/homebridge-blink-security)
+[![npm downloads](https://badgen.net/npm/dw/@jackietreeh0rn/homebridge-blink-security?color=purple&icon=npm&label&v=2)](https://www.npmjs.com/package/@jackietreeh0rn/homebridge-blink-security)
+[![GitHub Stars](https://badgen.net/github/stars/BitWise-0x/homebridge-blink-security?color=cyan&icon=github&v=2)](https://github.com/BitWise-0x/homebridge-blink-security)
+[![GitHub Last Commit](https://badgen.net/github/last-commit/BitWise-0x/homebridge-blink-security?color=cyan&icon=github&v=2)](https://github.com/BitWise-0x/homebridge-blink-security)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/BitWise-0x/homebridge-blink-security.svg?v=2)](https://github.com/BitWise-0x/homebridge-blink-security/pulls)
+[![GitHub issues](https://img.shields.io/github/issues/BitWise-0x/homebridge-blink-security.svg?v=2)](https://github.com/BitWise-0x/homebridge-blink-security/issues)
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security.svg?type=shield&issueType=license&v=2)](https://app.fossa.com/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security?ref=badge_shield&issueType=license)
 
 <!-- [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FBitWise-0x%2Fhomebridge-blink-security.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2FBitWise-0x%2Fhomebridge-blink-security?ref=badge_shield&issueType=security) -->
 <br>
