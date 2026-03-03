@@ -13,12 +13,14 @@ interface CSeqState {
  * records the CSeq value. Passes all data through unchanged.
  */
 class CSeqTracker extends Transform {
-  private _textBuf = '';
+  private _partial = '';
   private readonly _state: CSeqState;
+  private readonly _log?: Logger;
 
-  constructor(state: CSeqState) {
+  constructor(state: CSeqState, log?: Logger) {
     super();
     this._state = state;
+    this._log = log;
   }
 
   override _transform(
@@ -28,18 +30,26 @@ class CSeqTracker extends Transform {
   ): void {
     this.push(chunk);
 
-    this._textBuf += chunk.toString('ascii');
-    const match = this._textBuf.match(/CSeq:\s*(\d+)/i);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (!isNaN(num)) {
-        this._state.expectedCSeq = num;
-      }
+    // Prepend any partial line from the previous chunk
+    const text = this._partial + chunk.toString('ascii');
+
+    // Find ALL CSeq occurrences — take the last one (most recent request)
+    let lastCSeq: number | undefined;
+    const re = /CSeq:\s*(\d+)/gi;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      lastCSeq = parseInt(m[1], 10);
     }
 
-    // Prevent unbounded memory growth — only need the tail
-    if (this._textBuf.length > 512) {
-      this._textBuf = this._textBuf.slice(-256);
+    if (lastCSeq !== undefined && !isNaN(lastCSeq)) {
+      this._state.expectedCSeq = lastCSeq;
+      this._log?.debug(`RTSP CSeq tracked: ${lastCSeq}`);
+      this._partial = '';
+    } else {
+      // Keep only the last partial line in case CSeq: spans a chunk boundary
+      const lastNewline = text.lastIndexOf('\n');
+      this._partial =
+        lastNewline >= 0 ? text.slice(lastNewline + 1) : text.slice(-64);
     }
 
     done();
@@ -58,10 +68,12 @@ class CSeqFixer extends Transform {
   private _buf: Buffer = Buffer.alloc(0);
   private _bodyRemaining = 0;
   private readonly _state: CSeqState;
+  private readonly _log?: Logger;
 
-  constructor(state: CSeqState) {
+  constructor(state: CSeqState, log?: Logger) {
     super();
     this._state = state;
+    this._log = log;
   }
 
   override _transform(
@@ -103,10 +115,17 @@ class CSeqFixer extends Transform {
         // Rewrite CSeq to match what ffmpeg expects
         let headerStr = headerBlock.toString('ascii');
         if (this._state.expectedCSeq > 0) {
+          const origMatch = headerStr.match(/^CSeq:\s*(\d+)/im);
+          const origCSeq = origMatch ? origMatch[1] : '?';
           headerStr = headerStr.replace(
             /^CSeq:\s*\d+/im,
             `CSeq: ${this._state.expectedCSeq}`
           );
+          if (origCSeq !== String(this._state.expectedCSeq)) {
+            this._log?.debug(
+              `RTSP CSeq fixed: ${origCSeq} → ${this._state.expectedCSeq}`
+            );
+          }
         }
 
         this.push(Buffer.from(headerStr, 'ascii'));
@@ -173,6 +192,16 @@ export class RtspTlsProxy {
     this._server = net.createServer(tcpSocket => {
       this._tcpSocket = tcpSocket;
 
+      // Buffer ffmpeg data until TLS handshake completes
+      const pendingChunks: Buffer[] = [];
+      let connected = false;
+      tcpSocket.on('data', (chunk: Buffer) => {
+        if (!connected) {
+          pendingChunks.push(chunk);
+        }
+      });
+      tcpSocket.pause();
+
       const tlsSocket = tls.connect({
         host: this._targetHost,
         port: this._tlsPort,
@@ -182,15 +211,28 @@ export class RtspTlsProxy {
 
       tlsSocket.on('secureConnect', () => {
         this._tlsSocket = tlsSocket;
+        connected = true;
 
         const state: CSeqState = { expectedCSeq: 0 };
-        const tracker = new CSeqTracker(state);
-        const fixer = new CSeqFixer(state);
+        const tracker = new CSeqTracker(state, this._log);
+        const fixer = new CSeqFixer(state, this._log);
+
+        // Remove the buffering data listener before piping
+        tcpSocket.removeAllListeners('data');
 
         // ffmpeg → CSeqTracker (observe CSeq) → Blink server
         tcpSocket.pipe(tracker).pipe(tlsSocket);
         // Blink server → CSeqFixer (rewrite CSeq) → ffmpeg
         tlsSocket.pipe(fixer).pipe(tcpSocket);
+
+        // Flush any data ffmpeg sent before TLS was ready
+        for (const chunk of pendingChunks) {
+          tracker.write(chunk);
+        }
+        pendingChunks.length = 0;
+
+        // Resume the TCP socket so new data flows through the pipe
+        tcpSocket.resume();
       });
 
       tlsSocket.on('error', err => {
