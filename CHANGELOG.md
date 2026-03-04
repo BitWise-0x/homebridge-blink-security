@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.8...v1.1.9) (2026-03-04)
+
+### Bug Fixes
+
+* refresh thumbnail after live view for all cameras and resolve lint warnings ([1ce02bf](https://github.com/BitWise-0x/homebridge-blink-security/commit/1ce02bf6c756efd13066f12fedb14adb04b358ca))
+
 ## [1.1.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.7...v1.1.8) (2026-03-04)
 
 ### Bug Fixes
