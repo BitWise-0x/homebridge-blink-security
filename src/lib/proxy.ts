@@ -3,164 +3,52 @@ import tls from 'tls';
 import { Transform, TransformCallback } from 'stream';
 import type { Logger } from 'homebridge';
 
-// Shared state between the CSeq tracker and fixer transforms
-interface CSeqState {
-  expectedCSeq: number;
-}
+// ---------------------------------------------------------------------------
+// RTSP-to-MPEGTS proxy: handles RTSP negotiation itself and feeds raw
+// MPEG-TS to ffmpeg, bypassing ffmpeg's RTSP demuxer entirely.
+//
+// Blink XT servers auto-play after SETUP, sending interleaved RTP immediately.
+// ffmpeg's RTSP state machine discards all RTP data received before it
+// transitions to RTSP_STATE_STREAMING (after PLAY), losing the initial
+// keyframe. By handling RTSP ourselves and stripping RTP headers, we
+// capture every frame from the start.
+//
+// The SDP reveals the stream is MPEG-TS over RTP (payload type 33,
+// a=rtpmap:33 MP2T/90000), not raw H.264. So we just strip RTP headers
+// and feed the MPEG-TS payload directly to ffmpeg.
+// ---------------------------------------------------------------------------
 
 /**
- * CSeqTracker: Observes RTSP requests from ffmpeg (client → server) and
- * records the CSeq value. Passes all data through unchanged.
+ * Extract the video track control URL from SDP for use in SETUP request.
  */
-class CSeqTracker extends Transform {
-  private _partial = '';
-  private readonly _state: CSeqState;
-  private readonly _log?: Logger;
-
-  constructor(state: CSeqState, log?: Logger) {
-    super();
-    this._state = state;
-    this._log = log;
-  }
-
-  override _transform(
-    chunk: Buffer,
-    _encoding: string,
-    done: TransformCallback
-  ): void {
-    this.push(chunk);
-
-    // Prepend any partial line from the previous chunk
-    const text = this._partial + chunk.toString('ascii');
-
-    // Find ALL CSeq occurrences — take the last one (most recent request)
-    let lastCSeq: number | undefined;
-    const re = /CSeq:\s*(\d+)/gi;
-    let m;
-    while ((m = re.exec(text)) !== null) {
-      lastCSeq = parseInt(m[1], 10);
+function extractTrackUrl(sdp: string, baseUri: string): string {
+  // Find the video media section, then look for a=control within it
+  const videoSection = sdp.match(/m=video[\s\S]*?(?=m=|$)/);
+  if (videoSection) {
+    const controlMatch = videoSection[0].match(/a=control:(.+)/);
+    if (controlMatch) {
+      const control = controlMatch[1].trim();
+      if (control.startsWith('rtsp://')) return control;
+      // Relative control — append to base URI
+      return `${baseUri.replace(/\/$/, '')}/${control}`;
     }
-
-    if (lastCSeq !== undefined && !isNaN(lastCSeq)) {
-      this._state.expectedCSeq = lastCSeq;
-      this._log?.debug(`RTSP CSeq tracked: ${lastCSeq}`);
-      this._partial = '';
-    } else {
-      // Keep only the last partial line in case CSeq: spans a chunk boundary
-      const lastNewline = text.lastIndexOf('\n');
-      this._partial =
-        lastNewline >= 0 ? text.slice(lastNewline + 1) : text.slice(-64);
-    }
-
-    done();
   }
+  return baseUri;
 }
 
 /**
- * CSeqFixer: Rewrites the CSeq header in RTSP responses from the Blink
- * server to match the value ffmpeg expects. Correctly handles interleaved
- * RTP frames ($ prefix) by passing them through untouched.
+ * RTSP-to-MPEGTS proxy for Blink XT cameras.
  *
- * Blink XT cameras always respond with CSeq: 1 regardless of the request,
- * which causes ffmpeg to discard SETUP/PLAY responses and fail.
+ * Handles RTSP negotiation (OPTIONS, DESCRIBE, SETUP) over TLS, then
+ * de-frames interleaved RTP and strips RTP headers to emit raw MPEG-TS
+ * served over local TCP for ffmpeg to consume with `-f mpegts`.
  */
-class CSeqFixer extends Transform {
-  private _buf: Buffer = Buffer.alloc(0);
-  private _bodyRemaining = 0;
-  private readonly _state: CSeqState;
-  private readonly _log?: Logger;
-
-  constructor(state: CSeqState, log?: Logger) {
-    super();
-    this._state = state;
-    this._log = log;
-  }
-
-  override _transform(
-    chunk: Buffer,
-    _encoding: string,
-    done: TransformCallback
-  ): void {
-    this._buf = this._buf.length
-      ? (Buffer.concat([this._buf, chunk]) as Buffer)
-      : chunk;
-
-    while (this._buf.length > 0) {
-      // Forward response body bytes (e.g. SDP after DESCRIBE)
-      if (this._bodyRemaining > 0) {
-        const toConsume = Math.min(this._bodyRemaining, this._buf.length);
-        this.push(this._buf.subarray(0, toConsume));
-        this._buf = this._buf.subarray(toConsume);
-        this._bodyRemaining -= toConsume;
-        continue;
-      }
-
-      const firstByte = this._buf[0];
-
-      if (firstByte === 0x24) {
-        // Interleaved RTP frame: $ (1) + channel (1) + length (2 BE) + payload
-        if (this._buf.length < 4) break;
-        const frameLen = 4 + this._buf.readUInt16BE(2);
-        if (this._buf.length < frameLen) break;
-        this.push(this._buf.subarray(0, frameLen));
-        this._buf = this._buf.subarray(frameLen);
-      } else {
-        // RTSP text response — buffer until end of headers
-        const headerEnd = this._buf.indexOf('\r\n\r\n');
-        if (headerEnd === -1) break;
-
-        const headerBlock = this._buf.subarray(0, headerEnd + 4);
-        this._buf = this._buf.subarray(headerEnd + 4);
-
-        // Rewrite CSeq to match what ffmpeg expects
-        let headerStr = headerBlock.toString('ascii');
-        if (this._state.expectedCSeq > 0) {
-          const origMatch = headerStr.match(/^CSeq:\s*(\d+)/im);
-          const origCSeq = origMatch ? origMatch[1] : '?';
-          headerStr = headerStr.replace(
-            /^CSeq:\s*\d+/im,
-            `CSeq: ${this._state.expectedCSeq}`
-          );
-          if (origCSeq !== String(this._state.expectedCSeq)) {
-            this._log?.debug(
-              `RTSP CSeq fixed: ${origCSeq} → ${this._state.expectedCSeq}`
-            );
-          }
-        }
-
-        this.push(Buffer.from(headerStr, 'ascii'));
-
-        // Check for Content-Length body (e.g. SDP in DESCRIBE response)
-        const clMatch = headerStr.match(/Content-Length:\s*(\d+)/i);
-        if (clMatch) {
-          this._bodyRemaining = parseInt(clMatch[1], 10);
-        }
-      }
-    }
-
-    done();
-  }
-
-  override _flush(done: TransformCallback): void {
-    if (this._buf.length > 0) {
-      this.push(this._buf);
-    }
-    done();
-  }
-}
-
-/**
- * TLS-terminating proxy for RTSP streams with CSeq correction.
- *
- * ffmpeg connects to localhost:PORT over plain TCP. The proxy establishes
- * a TLS connection to the Blink RTSPS server and pipes data bidirectionally,
- * fixing the CSeq header in server responses so ffmpeg accepts them.
- */
-export class RtspTlsProxy {
+export class RtspToH264Proxy {
   private readonly _listenHost: string;
   private readonly _listenPort: number;
   private readonly _targetHost: string;
   private readonly _tlsPort: number;
+  private readonly _path: string;
   private readonly _log?: Logger;
   private _server?: net.Server;
   private _tcpSocket?: net.Socket;
@@ -169,6 +57,7 @@ export class RtspTlsProxy {
   constructor(
     listenPort: number,
     targetHost: string,
+    path: string,
     listenHost = '0.0.0.0',
     tlsPort = 443,
     log?: Logger
@@ -177,6 +66,7 @@ export class RtspTlsProxy {
     this._listenPort = listenPort;
     this._targetHost = targetHost;
     this._tlsPort = tlsPort;
+    this._path = path;
     this._log = log;
   }
 
@@ -189,19 +79,280 @@ export class RtspTlsProxy {
       return this._server;
     }
 
-    this._server = net.createServer(tcpSocket => {
-      this._tcpSocket = tcpSocket;
+    // Step 1: TLS connect
+    const tlsSocket = await this._connectTls();
+    this._tlsSocket = tlsSocket;
+    this._log?.debug(
+      `RTSP TLS connected to ${this._targetHost}:${this._tlsPort}`
+    );
 
-      // Buffer ffmpeg data until TLS handshake completes
-      const pendingChunks: Buffer[] = [];
-      let connected = false;
-      tcpSocket.on('data', (chunk: Buffer) => {
-        if (!connected) {
-          pendingChunks.push(chunk);
+    // Shared accumulation buffer + notify callback for the entire connection.
+    // A single persistent 'data' handler appends to this buffer. During
+    // negotiation, _waitForResponse drains RTSP responses from it. After
+    // negotiation, _consumeRtpFrames drains RTP frames from it.
+    let buf: Buffer = Buffer.alloc(0);
+    let onData: (() => void) | undefined;
+
+    tlsSocket.on('data', (chunk: Buffer) => {
+      buf = buf.length
+        ? Buffer.from(Buffer.concat([buf, chunk]))
+        : Buffer.from(chunk);
+      if (onData) onData();
+    });
+
+    // Helper: wait for a complete RTSP response in `buf`, return the body
+    // and leave leftover bytes in `buf`.
+    const waitForResponse = (method: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        let headerEnd = -1;
+        let contentLength = 0;
+        let headersDone = false;
+
+        const timer = setTimeout(() => {
+          onData = undefined;
+          reject(new Error(`RTSP ${method} timeout`));
+        }, 10000);
+
+        const tryParse = () => {
+          // Skip any interleaved RTP frames ($) before the RTSP text response
+          while (buf.length > 0 && buf[0] === 0x24) {
+            if (buf.length < 4) return;
+            const frameLen = 4 + buf.readUInt16BE(2);
+            if (buf.length < frameLen) return;
+            buf = Buffer.from(buf.subarray(frameLen));
+          }
+          if (buf.length === 0) return;
+
+          if (!headersDone) {
+            headerEnd = buf.indexOf('\r\n\r\n');
+            if (headerEnd === -1) return;
+            headersDone = true;
+            const headerStr = buf.subarray(0, headerEnd).toString('ascii');
+            const clMatch = headerStr.match(/Content-Length:\s*(\d+)/i);
+            contentLength = clMatch ? parseInt(clMatch[1], 10) : 0;
+          }
+
+          const bodyStart = headerEnd + 4;
+          if (buf.length - bodyStart < contentLength) return;
+
+          // Full response received
+          clearTimeout(timer);
+          onData = undefined;
+          const responseEnd = bodyStart + contentLength;
+          const responseStr = buf.subarray(0, responseEnd).toString('ascii');
+          buf =
+            buf.length > responseEnd
+              ? Buffer.from(buf.subarray(responseEnd))
+              : Buffer.alloc(0);
+
+          const bodyIdx = responseStr.indexOf('\r\n\r\n');
+          const body = bodyIdx >= 0 ? responseStr.substring(bodyIdx + 4) : '';
+          this._log?.debug(
+            `RTSP ${method} response: ${responseStr.split('\r\n')[0]}`
+          );
+          if (body) {
+            this._log?.debug(`RTSP ${method} body:\n${body}`);
+          }
+          resolve(body);
+        };
+
+        onData = tryParse;
+        // Check if data is already in the buffer
+        tryParse();
+      });
+    };
+
+    // Helper: send an RTSP request
+    const sendRequest = (
+      method: string,
+      uri: string,
+      cseq: number,
+      extraHeaders?: Record<string, string>
+    ) => {
+      let req = `${method} ${uri} RTSP/1.0\r\n`;
+      req += `CSeq: ${cseq}\r\n`;
+      req += 'User-Agent: Immedia WalnutPlayer\r\n';
+      if (extraHeaders) {
+        for (const [key, value] of Object.entries(extraHeaders)) {
+          req += `${key}: ${value}\r\n`;
+        }
+      }
+      req += '\r\n';
+      tlsSocket.write(req);
+    };
+
+    // Step 2: RTSP negotiation
+    const uri = `rtsp://${this._targetHost}${this._path}`;
+
+    // OPTIONS (non-fatal)
+    try {
+      sendRequest('OPTIONS', uri, 1);
+      await waitForResponse('OPTIONS');
+    } catch (err) {
+      this._log?.debug(
+        `RTSP OPTIONS failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+
+    // DESCRIBE — get SDP
+    sendRequest('DESCRIBE', uri, 2, { Accept: 'application/sdp' });
+    const sdpBody = await waitForResponse('DESCRIBE');
+    this._log?.debug(`RTSP SDP:\n${sdpBody}`);
+
+    // Extract track URL from SDP for SETUP
+    const trackUrl = extractTrackUrl(sdpBody, uri);
+    this._log?.debug(`RTSP SETUP track: ${trackUrl}`);
+
+    // SETUP — request interleaved TCP transport
+    sendRequest('SETUP', trackUrl, 3, {
+      Transport: 'RTP/AVP/TCP;unicast;interleaved=0-1',
+    });
+    await waitForResponse('SETUP');
+
+    // PLAY — required to start streaming; not all Blink servers auto-play
+    sendRequest('PLAY', uri, 4, { Range: 'npt=0.000-' });
+    await waitForResponse('PLAY');
+
+    // Step 3: Switch to streaming mode
+    let rtpFrameCount = 0;
+    let tcpClient: net.Socket | undefined;
+
+    this._log?.debug(`RTSP negotiation complete, ${buf.length} bytes buffered`);
+
+    // Now the persistent data handler switches to RTP consumption
+    onData = () => {
+      const result = this._consumeRtpFrames(buf, rtpFrameCount, tcpClient);
+      buf = result.remaining;
+      rtpFrameCount = result.frameCount;
+    };
+
+    // Process any data already in the buffer from SETUP leftover
+    if (buf.length > 0) {
+      onData();
+    }
+
+    // Step 4: Start TCP server for ffmpeg
+    this._server = net.createServer(socket => {
+      this._tcpSocket = socket;
+      tcpClient = socket;
+      this._log?.debug(
+        `RTSP MPEGTS ffmpeg client connected on port ${this._listenPort}`
+      );
+
+      // Flush any data accumulated before ffmpeg connected
+      if (buf.length > 0) {
+        const result = this._consumeRtpFrames(buf, rtpFrameCount, tcpClient);
+        buf = result.remaining;
+        rtpFrameCount = result.frameCount;
+      }
+
+      socket.on('error', () => {
+        try {
+          tlsSocket.end();
+        } catch {
+          // ignore
         }
       });
-      tcpSocket.pause();
+    });
 
+    tlsSocket.on('error', err => {
+      this._log?.debug(`RTSP TLS error: ${err.message}`);
+      try {
+        this._tcpSocket?.end();
+      } catch {
+        // ignore
+      }
+    });
+
+    tlsSocket.on('close', () => {
+      this._log?.debug('RTSP TLS closed');
+      try {
+        this._tcpSocket?.end();
+      } catch {
+        // ignore
+      }
+    });
+
+    return new Promise(resolve => {
+      this._server!.listen(this._listenPort, this._listenHost, () => {
+        this._log?.debug(
+          `RTSP MPEGTS proxy listening on port ${this._listenPort}`
+        );
+        resolve(this._server);
+      });
+    });
+  }
+
+  /**
+   * Consume interleaved RTP frames from buffer, strip RTP headers,
+   * and write MPEG-TS payload to the TCP client.
+   */
+  private _consumeRtpFrames(
+    buf: Buffer,
+    frameCount: number,
+    client?: net.Socket
+  ): { remaining: Buffer; frameCount: number } {
+    while (buf.length > 0) {
+      if (buf[0] === 0x24) {
+        // Interleaved frame: $ + channel + length(2 BE) + payload
+        if (buf.length < 4) break;
+        const payloadLen = buf.readUInt16BE(2);
+        const frameLen = 4 + payloadLen;
+        if (buf.length < frameLen) break;
+
+        const channel = buf[1];
+        if (channel === 0 && payloadLen > 12) {
+          // Video RTP — strip RTP header and write MPEG-TS payload
+          const rtp = buf.subarray(4, frameLen);
+          const headerLen = this._rtpHeaderLen(rtp);
+          let end = rtp.length;
+
+          // Handle RTP padding
+          if ((rtp[0] & 0x20) !== 0 && end > headerLen) {
+            const paddingLen = rtp[end - 1];
+            if (paddingLen > 0 && paddingLen <= end - headerLen) {
+              end -= paddingLen;
+            }
+          }
+
+          if (headerLen < end) {
+            const payload = rtp.subarray(headerLen, end);
+            if (client && !client.destroyed) {
+              client.write(payload);
+            }
+          }
+          frameCount++;
+        }
+        buf = buf.subarray(frameLen);
+      } else {
+        // Non-interleaved data — skip to next $ marker
+        const nextDollar = buf.indexOf(0x24, 1);
+        if (nextDollar > 0) {
+          buf = buf.subarray(nextDollar);
+        } else {
+          // No $ found — keep buffer, might be partial
+          break;
+        }
+      }
+    }
+
+    return { remaining: buf, frameCount };
+  }
+
+  private _rtpHeaderLen(pkt: Buffer): number {
+    if (pkt.length < 12) return pkt.length;
+    const cc = pkt[0] & 0x0f;
+    let offset = 12 + cc * 4;
+    if (pkt[0] & 0x10) {
+      if (pkt.length < offset + 4) return pkt.length;
+      const extLen = pkt.readUInt16BE(offset + 2);
+      offset += 4 + extLen * 4;
+    }
+    return offset;
+  }
+
+  private _connectTls(): Promise<tls.TLSSocket> {
+    return new Promise((resolve, reject) => {
       const tlsSocket = tls.connect({
         host: this._targetHost,
         port: this._tlsPort,
@@ -209,62 +360,18 @@ export class RtspTlsProxy {
         checkServerIdentity: () => undefined,
       });
 
-      tlsSocket.on('secureConnect', () => {
-        this._tlsSocket = tlsSocket;
-        connected = true;
+      const onError = (err: Error) => {
+        tlsSocket.removeListener('secureConnect', onConnect);
+        reject(err);
+      };
 
-        const state: CSeqState = { expectedCSeq: 0 };
-        const tracker = new CSeqTracker(state, this._log);
-        const fixer = new CSeqFixer(state, this._log);
+      const onConnect = () => {
+        tlsSocket.removeListener('error', onError);
+        resolve(tlsSocket);
+      };
 
-        // Remove the buffering data listener before piping
-        tcpSocket.removeAllListeners('data');
-
-        // ffmpeg → CSeqTracker (observe CSeq) → Blink server
-        tcpSocket.pipe(tracker).pipe(tlsSocket);
-        // Blink server → CSeqFixer (rewrite CSeq) → ffmpeg
-        tlsSocket.pipe(fixer).pipe(tcpSocket);
-
-        // Flush any data ffmpeg sent before TLS was ready
-        for (const chunk of pendingChunks) {
-          tracker.write(chunk);
-        }
-        pendingChunks.length = 0;
-
-        // Resume the TCP socket so new data flows through the pipe
-        tcpSocket.resume();
-      });
-
-      tlsSocket.on('error', err => {
-        this._log?.debug(`RTSP TLS error: ${err.message}`);
-        try {
-          tcpSocket.end();
-        } catch {
-          // ignore
-        }
-      });
-
-      tcpSocket.on('error', () => {
-        try {
-          tlsSocket.end();
-        } catch {
-          // ignore
-        }
-      });
-
-      tlsSocket.on('close', () => {
-        try {
-          tcpSocket.end();
-        } catch {
-          // ignore
-        }
-      });
-    });
-
-    return new Promise(resolve => {
-      this._server!.listen(this._listenPort, this._listenHost, () => {
-        resolve(this._server);
-      });
+      tlsSocket.once('secureConnect', onConnect);
+      tlsSocket.once('error', onError);
     });
   }
 

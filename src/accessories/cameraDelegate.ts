@@ -29,7 +29,7 @@ const {
 const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
-import { ImmiTunnel, RtspTlsProxy } from '../lib/proxy.js';
+import { ImmiTunnel, RtspToH264Proxy } from '../lib/proxy.js';
 
 interface SessionInfo {
   address: string;
@@ -48,7 +48,7 @@ interface ProxySession {
   protocol?: string;
   host?: string;
   listenPort?: number;
-  proxyServer?: ImmiTunnel | RtspTlsProxy;
+  proxyServer?: ImmiTunnel | RtspToH264Proxy;
   isImmi?: boolean;
   isRtsp?: boolean;
 }
@@ -63,6 +63,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private proxySessions = new Map<string, ProxySession>();
   private ongoingSessions = new Map<string, ChildProcess>();
   private streamTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private streamStartTimes = new Map<string, number>();
   private lastForcedRefresh = 0;
 
   constructor(
@@ -213,12 +214,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         isImmi: true,
       });
     } else if (liveViewURL?.startsWith('rtsp') && urlRegex.test(liveViewURL)) {
-      // RTSP/RTSPS — TLS proxy with CSeq fix for non-compliant Blink servers
+      // RTSPS — proxy handles RTSP negotiation and serves MPEG-TS over local TCP
       const [, protocol, host, path] = urlRegex.exec(liveViewURL)!;
       const [listenPort] = await reservePorts({ count: 1 });
-      const proxyServer = new RtspTlsProxy(
+      const proxyServer = new RtspToH264Proxy(
         listenPort,
         host,
+        path,
         '0.0.0.0',
         443,
         this.log
@@ -264,6 +266,12 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     if (request.type === StreamRequestTypes.START) {
       await this.startStream(request.sessionID, request.video, request.audio);
+    } else if (request.type === StreamRequestTypes.RECONFIGURE) {
+      this.log.info(
+        `${this.blinkCamera.name} - LiveView RECONFIGURE (${request.video.width}x${request.video.height}, ${request.video.fps} fps, ${request.video.max_bit_rate} kbps)`
+      );
+      // Acknowledge reconfigure — we can't change the Blink stream parameters
+      // mid-stream, but acknowledging prevents HomeKit from killing the stream.
     } else if (request.type === StreamRequestTypes.STOP) {
       await this.stopStream(request.sessionID);
     }
@@ -304,8 +312,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     const ffmpegArgs: string[] = [];
 
-    // Whether this source has audio (live streams do, static fallback doesn't)
-    const hasAudio = !!rtspProxy?.proxyServer;
+    // IMMI streams have audio; RTSP XT streams are video-only; static fallback has none.
+    const hasAudio = !!rtspProxy?.proxyServer && !rtspProxy?.isRtsp;
 
     if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
       // IMMI protocol — MPEG-TS input from local tunnel
@@ -333,21 +341,45 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-dn'
       );
     } else if (rtspProxy?.isRtsp && rtspProxy.proxyServer) {
-      // RTSP via TLS proxy with CSeq fix
+      // RTSPS via RTSP-to-MPEGTS proxy — the proxy handles RTSP negotiation,
+      // strips interleaved framing and RTP headers, serves raw MPEG-TS over TCP.
+      // Re-encode with libx264 to smooth bursty frame delivery from Blink XT
+      // and produce immediate keyframes (source has ~8s keyframe interval).
+      // Use CRF for consistent quality instead of bitrate caps that starve the encoder.
       ffmpegArgs.push(
         '-hide_banner',
         '-loglevel',
         'warning',
-        '-rtsp_transport',
-        'tcp',
-        '-user_agent',
-        'Immedia WalnutPlayer',
+        '-analyzeduration',
+        '0',
+        '-probesize',
+        '131072',
+        '-fflags',
+        '+nobuffer+discardcorrupt',
+        '-flags',
+        'low_delay',
+        '-f',
+        'mpegts',
         '-i',
-        `rtsp://localhost:${rtspProxy.listenPort}${rtspProxy.path}`,
+        `tcp://localhost:${rtspProxy.listenPort}`,
+        '-fps_mode',
+        'passthrough',
         '-map',
         '0:v',
-        '-vcodec',
-        'copy',
+        '-c:v',
+        'libx264',
+        '-preset',
+        'ultrafast',
+        '-tune',
+        'zerolatency',
+        '-pix_fmt',
+        'yuv420p',
+        '-profile:v',
+        'baseline',
+        '-crf',
+        '23',
+        '-g',
+        '30',
         '-sn',
         '-dn'
       );
@@ -466,6 +498,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       env: process.env,
     });
     this.ongoingSessions.set(sessionID, ffmpegVideo);
+    this.streamStartTimes.set(sessionID, Date.now());
     this.pendingSessions.delete(sessionID);
 
     // Auto-kill stream after 5 minutes to prevent orphaned processes
@@ -482,7 +515,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     );
 
     ffmpegVideo.stderr?.on('data', (data: Buffer) =>
-      this.log.debug(`${this.blinkCamera.name} - STDERR: ${String(data)}`)
+      this.log.debug(
+        `${this.blinkCamera.name} - ffmpeg: ${String(data).trim()}`
+      )
     );
 
     ffmpegVideo.on('error', error => {
@@ -508,7 +543,14 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   }
 
   private async stopStream(sessionID: string): Promise<void> {
-    this.log.info(`${this.blinkCamera.name} - LiveView STOP`);
+    const startTime = this.streamStartTimes.get(sessionID);
+    const elapsed = startTime
+      ? ((Date.now() - startTime) / 1000).toFixed(1)
+      : '?';
+    this.streamStartTimes.delete(sessionID);
+    this.log.info(
+      `${this.blinkCamera.name} - LiveView STOP (streamed ${elapsed}s)`
+    );
 
     const timeout = this.streamTimeouts.get(sessionID);
     if (timeout) {
