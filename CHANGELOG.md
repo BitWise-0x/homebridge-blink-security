@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.7...v1.1.8) (2026-03-04)
+
+### Bug Fixes
+
+* use RTSP-to-MPEGTS proxy with re-encoding for Blink XT live view ([e1eb6d7](https://github.com/BitWise-0x/homebridge-blink-security/commit/e1eb6d7d4344f2949e2abe09cd5cc652b94a3a6b))
+
 ## [1.1.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.6...v1.1.7) (2026-03-03)
 
 ### Bug Fixes
