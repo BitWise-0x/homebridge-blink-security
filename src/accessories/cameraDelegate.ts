@@ -146,6 +146,15 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       audioSSRC,
     };
 
+    const audioResponse = request.audio
+      ? {
+          port: request.audio.port,
+          ssrc: audioSSRC,
+          srtp_key: request.audio.srtp_key,
+          srtp_salt: request.audio.srtp_salt,
+        }
+      : undefined;
+
     const response: PrepareStreamResponse = {
       addressOverride: await getDefaultIpAddress(
         request.addressVersion === 'ipv6'
@@ -156,14 +165,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         srtp_key: request.video.srtp_key,
         srtp_salt: request.video.srtp_salt,
       },
-      audio: request.audio
-        ? {
-            port: request.audio.port,
-            ssrc: audioSSRC,
-            srtp_key: request.audio.srtp_key,
-            srtp_salt: request.audio.srtp_salt,
-          }
-        : undefined,
+      audio: audioResponse,
     };
 
     this.pendingSessions.set(request.sessionID, sessionInfo);
@@ -267,8 +269,10 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     if (request.type === StreamRequestTypes.START) {
       await this.startStream(request.sessionID, request.video, request.audio);
     } else if (request.type === StreamRequestTypes.RECONFIGURE) {
+      const v = request.video;
       this.log.info(
-        `${this.blinkCamera.name} - LiveView RECONFIGURE (${request.video.width}x${request.video.height}, ${request.video.fps} fps, ${request.video.max_bit_rate} kbps)`
+        `${this.blinkCamera.name} - LiveView RECONFIGURE` +
+          ` (${v.width}x${v.height}, ${v.fps} fps, ${v.max_bit_rate} kbps)`
       );
       // Acknowledge reconfigure — we can't change the Blink stream parameters
       // mid-stream, but acknowledging prevents HomeKit from killing the stream.
@@ -560,7 +564,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     // Check if this was a real live view before cleanup deletes the session
     const session = this.proxySessions.get(sessionID);
-    const hadLiveView = session?.proxyServer != null;
+    const hadLiveView = session?.proxyServer !== undefined;
 
     // Clean up temp snapshot file if it exists
     const tmpPath = join(tmpdir(), `blink-snapshot-${sessionID}.jpg`);
@@ -591,12 +595,10 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     // After a real live view, request a fresh thumbnail so the Home app
     // shows a recent image instead of a stale one.
-    // Skip for: image-fallback streams, battery cameras on disarmed networks,
-    // and if a forced refresh already happened recently (avoid 409s).
+    // Skip for: image-fallback streams and if a forced refresh already
+    // happened recently (avoid 409s).
     const shouldRefresh =
-      hadLiveView &&
-      (!this.blinkCamera.isBatteryPower || this.blinkCamera.armed) &&
-      Date.now() - this.lastForcedRefresh > 300_000;
+      hadLiveView && Date.now() - this.lastForcedRefresh > 300_000;
 
     if (shouldRefresh) {
       this.lastForcedRefresh = Date.now();
