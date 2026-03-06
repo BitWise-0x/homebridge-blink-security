@@ -195,6 +195,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 
 ## Useful Resources
 
+- [Homebridge SmartRent & Blink — Blog Post](https://blog.bitwisesolutions.co/blog/homebridge-smartrent-blink)
 - [MattTW/BlinkMonitorProtocol](https://github.com/MattTW/BlinkMonitorProtocol) — Blink API documentation
 - [fronzbot/blinkpy](https://github.com/fronzbot/blinkpy) — Python Blink library (Home Assistant)
 - [Homebridge Developer Documentation](https://developers.homebridge.io/)
