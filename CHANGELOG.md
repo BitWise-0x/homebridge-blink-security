@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.9...v1.2.0) (2026-03-06)
+
+### Features
+
+* **certification:** add verified by Homebridge badge to README ([8e719ba](https://github.com/BitWise-0x/homebridge-blink-security/commit/8e719ba3cfe16096785dff5308951aa2bdc69662))
+
 ## [1.1.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.1.8...v1.1.9) (2026-03-04)
 
 ### Bug Fixes
