@@ -8,7 +8,7 @@
   Homebridge Blink Security
 </h1>
 
-<!-- [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) -->
+[![verified-by-homebridge](https://img.shields.io/badge/homebridge-verified-blueviolet?color=%23491F59&style=for-the-badge&logoColor=%23FFFFFF&logo=homebridge)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 
 [![npm version](https://badgen.net/npm/v/@jackietreeh0rn/homebridge-blink-security?color=purple&icon=npm&label&v=2)](https://www.npmjs.com/package/@jackietreeh0rn/homebridge-blink-security)
 [![npm downloads](https://badgen.net/npm/dw/@jackietreeh0rn/homebridge-blink-security?color=purple&icon=npm&label&v=2)](https://www.npmjs.com/package/@jackietreeh0rn/homebridge-blink-security)
