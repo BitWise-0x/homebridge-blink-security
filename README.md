@@ -27,7 +27,7 @@
 <p align="center">
   <img src="homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home — camera feeds and security status" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="homebridge-ui/public/screenshot5.jpeg" width="200" alt="Apple Home — security system arm/disarm" />
+  <img src="homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home — security system arm/disarm" />
 </p>
 
 <br>
@@ -47,9 +47,38 @@
 
 </div>
 
-<p align="center">
-  <img src="homebridge-ui/public/screenshot3.png" alt="Homebridge logs" />
-</p>
+<br>
+
+## Architecture
+
+```mermaid
+graph TD
+    Home["🏠 Apple Home"]
+
+    subgraph Homebridge
+        platform["<b>BlinkSecurityPlatform</b><br>DynamicPlatformPlugin"]
+        acc_sec["<b>SecuritySystem</b><br>arm / disarm per network"]
+        acc_cam["<b>Camera</b><br>live view · snapshots<br>motion · battery · temp"]
+        acc_door["<b>Doorbell</b><br>press notification<br>+ camera features"]
+        acc_siren["<b>Siren</b><br>on / off"]
+    end
+
+    subgraph Blink Cloud
+        auth["<b>OAuth 2.0 + PKCE</b><br>+ 2FA PIN"]
+        api["<b>Blink REST API</b><br>immedia-semi.com"]
+        immi["<b>IMMI Streaming</b><br>H.264 via ffmpeg"]
+    end
+
+    Home <-->|"HomeKit"| acc_sec
+    Home <-->|"HomeKit"| acc_cam
+    Home <-->|"HomeKit"| acc_door
+    Home <-->|"HomeKit"| acc_siren
+    platform --> acc_sec & acc_cam & acc_door & acc_siren
+    platform -->|"polling 10s<br>commands"| api
+    platform -->|"token refresh<br>session persist"| auth
+    acc_cam & acc_door -->|"live view"| immi
+    auth --> api
+```
 
 <br>
 
@@ -90,6 +119,10 @@
 
 <p align="center">
   <img src="homebridge-ui/public/screenshot1.png" width="400" alt="Plugin settings screenshot" />
+</p>
+
+<p align="center">
+  <img src="homebridge-ui/public/screenshot3.png" alt="Homebridge logs" />
 </p>
 
 ### Manual
@@ -195,7 +228,8 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 
 ## Useful Resources
 
-- [Homebridge SmartRent & Blink — Blog Post](https://blog.bitwisesolutions.co/blog/homebridge-smartrent-blink)
+> **Read the full write-up:** [Homebridge SmartRent & Blink](https://blog.bitwisesolutions.co/blog/homebridge-smartrent-blink) — covers setup, configuration, and integration details for both plugins.
+
 - [MattTW/BlinkMonitorProtocol](https://github.com/MattTW/BlinkMonitorProtocol) — Blink API documentation
 - [fronzbot/blinkpy](https://github.com/fronzbot/blinkpy) — Python Blink library (Home Assistant)
 - [Homebridge Developer Documentation](https://developers.homebridge.io/)
