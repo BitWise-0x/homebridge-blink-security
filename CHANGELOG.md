@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.1...v1.2.2) (2026-03-19)
+
+### Bug Fixes
+
+* **discovery:** synthesize doorbell data with guaranteed id and network_id ([a259cec](https://github.com/BitWise-0x/homebridge-blink-security/commit/a259cec916969241cd1e5a9d52ce3c839b49c1ae))
+
 ## [1.2.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.0...v1.2.1) (2026-03-19)
 
 ### Bug Fixes
