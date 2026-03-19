@@ -38,12 +38,12 @@
 
 | Device                    | Model Type            | Capabilities                                                                                                                                                                                                        |
 | ------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 📹 Blink Outdoor / Indoor | `default`, `catalina` | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
-| 📹 Blink Mini             | `owl`                 | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
-| 📹 Blink Mini 2           | `hawk`                | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
-| 💡 Blink Wired Floodlight | `superior_owl`        | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
-| 🔔 Blink Video Doorbell   | `lotus`               | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Doorbell press notification</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                            |
-| 🔊 Blink Siren            | siren                 | <ul><li>On/off switch</li></ul>                                                                                                                                                                                     |
+| 📷 Blink Outdoor / Indoor | `default`, `catalina` | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
+| 📸 Blink Mini             | `owl`                 | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
+| 📸 Blink Mini 2           | `hawk`                | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
+| 🔦 Blink Wired Floodlight | `superior_owl`        | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
+| 🚪 Blink Video Doorbell   | `lotus`               | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Doorbell press notification</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                            |
+| 🚨 Blink Siren            | siren                 | <ul><li>On/off switch</li></ul>                                                                                                                                                                                     |
 
 </div>
 
