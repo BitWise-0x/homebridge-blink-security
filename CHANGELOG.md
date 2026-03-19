@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.3...v1.2.4) (2026-03-19)
+
+### Bug Fixes
+
+* **doorbell:** repopulate thumbnail from recent media after 404 clearance ([e05aee2](https://github.com/BitWise-0x/homebridge-blink-security/commit/e05aee263bf8e46a2ef745b61c435bbb52ec5947))
+
 ## [1.2.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.2...v1.2.3) (2026-03-19)
 
 ### Bug Fixes
