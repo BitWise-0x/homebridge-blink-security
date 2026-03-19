@@ -193,8 +193,19 @@ export class Blink {
               ttl
             );
             const raw = config as unknown as Record<string, unknown>;
-            // Preserve synthesized id/network_id, update other fields
             const current = doorbell.data;
+
+            // If thumbnail was cleared (404), try to repopulate from recent media
+            let thumbnail = current.thumbnail;
+            if (!thumbnail) {
+              const lastMedia = await this.getCameraLastMotion(
+                doorbell.networkID,
+                id
+              );
+              thumbnail = lastMedia?.thumbnail ?? '';
+            }
+
+            // Preserve synthesized id/network_id, update other fields
             doorbell.data = {
               ...current,
               name: (raw.name as string) ?? current.name,
@@ -203,6 +214,7 @@ export class Blink {
               enabled: (raw.enabled as boolean) ?? current.enabled,
               status: (raw.status as string) ?? current.status,
               battery: raw.battery as string | undefined,
+              thumbnail,
               updated_at: (raw.updated_at as string) ?? current.updated_at,
             };
           } catch {
