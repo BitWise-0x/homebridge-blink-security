@@ -26,6 +26,7 @@ export const MOTION_POLL = 15;
 export const STATUS_POLL = 30;
 export const ARMED_DELAY = 60;
 export const MOTION_TRIGGER_DECAY = 90;
+export const DOORBELL_DEVICE_TYPE = 'lotus';
 
 export class Blink {
   readonly api: BlinkApi;
@@ -78,9 +79,59 @@ export class Blink {
       ...(homescreen.owls ?? []),
     ];
 
-    const allDoorbells: HomescreenCamera[] = [
+    let allDoorbells: HomescreenCamera[] = [
       ...(homescreen.doorbell_buttons ?? []),
     ];
+
+    // Fallback: discover doorbells from recent media when doorbell_buttons is empty
+    if (allDoorbells.length === 0 && this.networks.size === 0) {
+      try {
+        const mediaRes = await this.api
+          .getMediaChange(ttl)
+          .catch(() => ({ media: [] }));
+
+        const doorbellIds = new Map<number, { network_id: number }>();
+        for (const entry of mediaRes.media ?? []) {
+          if (
+            entry.device === DOORBELL_DEVICE_TYPE &&
+            !doorbellIds.has(entry.device_id)
+          ) {
+            doorbellIds.set(entry.device_id, {
+              network_id: entry.network_id,
+            });
+          }
+        }
+
+        const fallbackDoorbells: HomescreenCamera[] = [];
+        for (const [deviceId, { network_id }] of doorbellIds) {
+          try {
+            const config = await this.api.getDoorbellConfig(
+              network_id,
+              deviceId,
+              ttl
+            );
+            fallbackDoorbells.push(config as HomescreenCamera);
+          } catch (err) {
+            this.log.debug(
+              `Failed to fetch config for doorbell ${deviceId}: ${err}`
+            );
+          }
+        }
+
+        if (fallbackDoorbells.length > 0) {
+          this.log.info(
+            `Blink fallback discovered ${fallbackDoorbells.length} doorbell(s) from recent media.`
+          );
+          allDoorbells = fallbackDoorbells;
+        }
+      } catch (err) {
+        this.log.debug(`Doorbell fallback discovery failed: ${err}`);
+      }
+    }
+
+    // Exclude fallback-discovered doorbells from camera list to prevent duplicates
+    const doorbellIdSet = new Set(allDoorbells.map(d => d.id));
+    const filteredCameras = allCameras.filter(c => !doorbellIdSet.has(c.id));
 
     const allSirens: HomescreenSiren[] = [...(homescreen.sirens ?? [])];
 
@@ -96,7 +147,7 @@ export class Blink {
           this.networks.get(n.id)!.data = n as NetworkData;
         }
       }
-      for (const c of allCameras) {
+      for (const c of filteredCameras) {
         if (this.cameras.has(c.id)) {
           this.cameras.get(c.id)!.data = c;
         }
@@ -118,7 +169,9 @@ export class Blink {
           this.createNetwork(n as NetworkData),
         ])
       );
-      this.cameras = new Map(allCameras.map(c => [c.id, this.createCamera(c)]));
+      this.cameras = new Map(
+        filteredCameras.map(c => [c.id, this.createCamera(c)])
+      );
       this.doorbells = new Map(
         allDoorbells.map(d => [d.id, this.createDoorbell(d)])
       );

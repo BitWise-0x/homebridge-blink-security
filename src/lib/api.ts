@@ -182,8 +182,8 @@ export class BlinkApi {
     networkID: number,
     doorbellID: number,
     maxTTL = 3600
-  ): Promise<CameraStatusResponse> {
-    return this.client.get<CameraStatusResponse>(
+  ): Promise<DoorbellConfigResponse> {
+    return this.client.get<DoorbellConfigResponse>(
       `/api/v1/accounts/{accountID}/networks/${networkID}/doorbells/${doorbellID}/config`,
       maxTTL
     );
@@ -517,6 +517,22 @@ export interface CameraStatusResponse {
   };
 }
 
+export interface DoorbellConfigResponse {
+  id: number;
+  network_id: number;
+  name: string;
+  serial: string;
+  fw_version: string;
+  type: string;
+  enabled: boolean;
+  thumbnail: string;
+  status: string;
+  battery?: string;
+  signals?: { lfr?: number; wifi?: number; temp?: number; battery?: number };
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CommandResponse {
   id?: number;
   command_id?: number;
@@ -550,6 +566,7 @@ export interface MediaEntry {
   updated_at: string;
   device_id: number;
   network_id: number;
+  device: string;
   thumbnail: string;
   media?: string;
 }
