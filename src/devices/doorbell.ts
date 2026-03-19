@@ -8,6 +8,7 @@ export type DoorbellPressCallback = (doorbell: BlinkDoorbell) => void;
 
 export class BlinkDoorbell extends BlinkCamera {
   private _onPress?: DoorbellPressCallback;
+  private readonly _initTime = Date.now();
 
   constructor(data: HomescreenCamera, blink: Blink) {
     super(data, blink);
@@ -26,7 +27,7 @@ export class BlinkDoorbell extends BlinkCamera {
   }
 
   get lastDoorbellPress(): number {
-    return this._context.lastDoorbellPress ?? 0;
+    return this._context.lastDoorbellPress ?? this._initTime;
   }
 
   set lastDoorbellPress(val: number) {
@@ -49,6 +50,12 @@ export class BlinkDoorbell extends BlinkCamera {
       .getCameraLastMotion(this.networkID, this.cameraID)
       .catch(() => undefined);
     if (!lastMotion) {
+      return false;
+    }
+
+    // If the API provides a source field, only treat "button" as a press.
+    // Other sources (e.g. "pir", liveview) are not doorbell presses.
+    if (lastMotion.source && lastMotion.source !== 'button') {
       return false;
     }
 

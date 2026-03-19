@@ -567,6 +567,7 @@ export interface MediaEntry {
   device_id: number;
   network_id: number;
   device: string;
+  source?: string;
   thumbnail: string;
   media?: string;
 }

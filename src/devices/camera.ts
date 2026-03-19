@@ -248,7 +248,16 @@ export class BlinkCamera extends BlinkDevice {
     }
 
     this.blink.log.debug(`${this.name} - Thumbnail fetch: ${thumbnailUrl}`);
-    const data = await this.blink.api.getBinary(thumbnailUrl);
+    let data: Buffer;
+    try {
+      data = await this.blink.api.getBinary(thumbnailUrl);
+    } catch {
+      // Thumbnail URL is stale (404) — clear it so the next poll can provide a fresh one
+      if (this.data.thumbnail === thumbnailUrl) {
+        (this.data as HomescreenCamera).thumbnail = '';
+      }
+      return undefined;
+    }
     // Only cache non-empty results — 0-byte responses should be retried
     if (data.length > 0) {
       this.cacheThumbnail.clear();

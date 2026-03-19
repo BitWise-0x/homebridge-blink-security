@@ -183,6 +183,33 @@ export class Blink {
           this.doorbells.get(d.id)!.data = d;
         }
       }
+      // Refresh fallback-discovered doorbells not present in homescreen
+      for (const [id, doorbell] of this.doorbells) {
+        if (!doorbellIdSet.has(id)) {
+          try {
+            const config = await this.api.getDoorbellConfig(
+              doorbell.networkID,
+              id,
+              ttl
+            );
+            const raw = config as unknown as Record<string, unknown>;
+            // Preserve synthesized id/network_id, update other fields
+            const current = doorbell.data;
+            doorbell.data = {
+              ...current,
+              name: (raw.name as string) ?? current.name,
+              serial: (raw.serial as string) ?? current.serial,
+              fw_version: (raw.fw_version as string) ?? current.fw_version,
+              enabled: (raw.enabled as boolean) ?? current.enabled,
+              status: (raw.status as string) ?? current.status,
+              battery: raw.battery as string | undefined,
+              updated_at: (raw.updated_at as string) ?? current.updated_at,
+            };
+          } catch {
+            // Config fetch failed — keep existing data
+          }
+        }
+      }
       for (const s of allSirens) {
         if (this.sirens.has(s.id)) {
           this.sirens.get(s.id)!.data = s;
