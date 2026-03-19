@@ -90,7 +90,10 @@ export class Blink {
           .getMediaChange(ttl)
           .catch(() => ({ media: [] }));
 
-        const doorbellIds = new Map<number, { network_id: number }>();
+        const doorbellIds = new Map<
+          number,
+          { network_id: number; thumbnail: string }
+        >();
         for (const entry of mediaRes.media ?? []) {
           if (
             entry.device === DOORBELL_DEVICE_TYPE &&
@@ -98,19 +101,42 @@ export class Blink {
           ) {
             doorbellIds.set(entry.device_id, {
               network_id: entry.network_id,
+              thumbnail: entry.thumbnail,
             });
           }
         }
 
         const fallbackDoorbells: HomescreenCamera[] = [];
-        for (const [deviceId, { network_id }] of doorbellIds) {
+        for (const [deviceId, { network_id, thumbnail }] of doorbellIds) {
           try {
             const config = await this.api.getDoorbellConfig(
               network_id,
               deviceId,
               ttl
             );
-            fallbackDoorbells.push(config as HomescreenCamera);
+            // The config endpoint may return fields under different names
+            // (e.g. camera_id instead of id) or nest them. Synthesize a
+            // HomescreenCamera using known-good values from the media entry
+            // and fill in what the config provides.
+            const raw = config as unknown as Record<string, unknown>;
+            const doorbell: HomescreenCamera = {
+              id: (raw.id as number) ?? deviceId,
+              network_id: (raw.network_id as number) ?? network_id,
+              name: (raw.name as string) ?? `Doorbell ${deviceId}`,
+              serial: (raw.serial as string) ?? '',
+              fw_version: (raw.fw_version as string) ?? '',
+              type: (raw.type as string) ?? DOORBELL_DEVICE_TYPE,
+              enabled: (raw.enabled as boolean) ?? true,
+              thumbnail: (raw.thumbnail as string) ?? thumbnail ?? '',
+              status: (raw.status as string) ?? 'online',
+              battery: raw.battery as string | undefined,
+              signals: raw.signals as HomescreenCamera['signals'],
+              created_at:
+                (raw.created_at as string) ?? new Date().toISOString(),
+              updated_at:
+                (raw.updated_at as string) ?? new Date().toISOString(),
+            };
+            fallbackDoorbells.push(doorbell);
           } catch (err) {
             this.log.debug(
               `Failed to fetch config for doorbell ${deviceId}: ${err}`
