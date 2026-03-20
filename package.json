@@ -55,7 +55,7 @@
     "setup-log": "touch $(pwd)/test/hbConfig/homebridge.log && sed -i '' \"s|<log_file>|$(pwd)/test/hbConfig/homebridge.log|g\" $(pwd)/test/hbConfig/config.json"
   },
   "dependencies": {
-    "@homebridge/camera-utils": "^2.2.6",
+    "@homebridge/camera-utils": "^3.0.0",
     "axios": "^1.7.9",
     "ffmpeg-for-homebridge": "^2.1.1"
   },
