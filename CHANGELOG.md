@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.5...v1.2.6) (2026-03-31)
+
+### Bug Fixes
+
+* **deps:** migrate camera-utils import from CJS require to ESM ([6256ea8](https://github.com/BitWise-0x/homebridge-blink-security/commit/6256ea8ca7abfc177fac39e3f9aeaa3f6a75f182))
+
 ## [1.2.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.4...v1.2.5) (2026-03-29)
 
 ### Bug Fixes
