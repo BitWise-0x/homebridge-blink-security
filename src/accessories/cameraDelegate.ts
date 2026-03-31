@@ -19,13 +19,10 @@ import {
   type VideoInfo,
 } from 'homebridge';
 
-import { createRequire } from 'module';
+import { getDefaultIpAddress, reservePorts } from '@homebridge/camera-utils';
 
+import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const {
-  getDefaultIpAddress,
-  reservePorts,
-} = require('@homebridge/camera-utils');
 const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
