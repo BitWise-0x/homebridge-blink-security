@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.7...v1.2.8) (2026-04-01)
+
+### Bug Fixes
+
+* **thumbnails:** serialize thumbnail commands per sync module ([67515db](https://github.com/BitWise-0x/homebridge-blink-security/commit/67515db86312715bdc8275cbb213ec1e506c9874))
+
 ## [1.2.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.6...v1.2.7) (2026-04-01)
 
 ### Bug Fixes
