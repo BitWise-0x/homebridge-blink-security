@@ -195,14 +195,18 @@ export class Blink {
             const raw = config as unknown as Record<string, unknown>;
             const current = doorbell.data;
 
-            // If thumbnail was cleared (404), try to repopulate from recent media
-            let thumbnail = current.thumbnail;
-            if (!thumbnail) {
-              const lastMedia = await this.getCameraLastMotion(
-                doorbell.networkID,
-                id
-              );
-              thumbnail = lastMedia?.thumbnail ?? '';
+            // Use thumbnail from config if available, otherwise check recent
+            // media for a newer one (e.g. after a post-stream thumbnail refresh).
+            let thumbnail = (raw.thumbnail as string) || current.thumbnail;
+            const lastMedia = await this.getCameraLastMotion(
+              doorbell.networkID,
+              id
+            ).catch(() => undefined);
+            if (lastMedia?.thumbnail) {
+              const mediaTime = Date.parse(lastMedia.created_at) || 0;
+              if (mediaTime > doorbell.thumbnailCreatedAt || !thumbnail) {
+                thumbnail = lastMedia.thumbnail;
+              }
             }
 
             // Preserve synthesized id/network_id, update other fields

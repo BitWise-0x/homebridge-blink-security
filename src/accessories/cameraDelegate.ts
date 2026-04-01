@@ -601,12 +601,12 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       this.lastForcedRefresh = Date.now();
       this.blinkCamera
         .refreshThumbnail(true)
-        .then(() => this.blinkCamera.clearThumbnailCache())
         .catch(e =>
           this.log.debug(
             `${this.blinkCamera.name} - Post-stream thumbnail refresh failed: ${e}`
           )
-        );
+        )
+        .finally(() => this.blinkCamera.clearThumbnailCache());
     }
   }
 
