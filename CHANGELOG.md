@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.8...v1.2.9) (2026-04-01)
+
+### Reverts
+
+* Revert "chore(release): 1.2.8 [skip ci]" ([fe50736](https://github.com/BitWise-0x/homebridge-blink-security/commit/fe50736cce734f8e5994bdbec055efbc2da1387f))
+* Revert "fix(thumbnails): serialize thumbnail commands per sync module" ([09f044a](https://github.com/BitWise-0x/homebridge-blink-security/commit/09f044a51ced197721c0575d9934f1cfe8e7427d))
+
 ## [1.2.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.6...v1.2.7) (2026-04-01)
 
 ### Bug Fixes
