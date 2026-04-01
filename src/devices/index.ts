@@ -404,8 +404,8 @@ export class Blink {
                   camera.cameraID
                 );
 
-          await this.api.lock(
-            `refreshCameraThumbnail(${camera.networkID}, ${camera.cameraID})`,
+          await this.api.queue(
+            `network:${camera.networkID}:command`,
             async () => {
               await this.api.command(camera.networkID, updateCamera);
             }
@@ -540,14 +540,11 @@ export class Blink {
 
       doorbell.thumbnailCreatedAt = Date.now();
 
-      await this.api.lock(
-        `refreshDoorbellThumbnail(${networkID}, ${doorbellID})`,
-        async () => {
-          await this.api.command(networkID, () =>
-            this.api.updateDoorbellThumbnail(networkID, doorbellID)
-          );
-        }
-      );
+      await this.api.queue(`network:${networkID}:command`, async () => {
+        await this.api.command(networkID, () =>
+          this.api.updateDoorbellThumbnail(networkID, doorbellID)
+        );
+      });
 
       await this.refreshData(true);
     }
