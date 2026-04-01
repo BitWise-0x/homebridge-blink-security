@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.6...v1.2.7) (2026-04-01)
+
+### Bug Fixes
+
+* **thumbnails:** clear cache after stream ends regardless of refresh result ([45d9c3f](https://github.com/BitWise-0x/homebridge-blink-security/commit/45d9c3f8d224f6bc7a9aa20b7c8b15c76f1965aa))
+
 ## [1.2.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.5...v1.2.6) (2026-03-31)
 
 ### Bug Fixes
