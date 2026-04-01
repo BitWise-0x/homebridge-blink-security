@@ -8,7 +8,6 @@ export class BlinkApi {
   readonly client: BlinkClient;
   private readonly log: Logger;
   private readonly _lockCache = new Map<string, Promise<unknown>>();
-  private readonly _queueTail = new Map<string, Promise<void>>();
 
   constructor(authClient: BlinkAuthClient, log: Logger) {
     this.log = log;
@@ -445,26 +444,6 @@ export class BlinkApi {
     } finally {
       this._lockCache.delete(name);
     }
-  }
-
-  async queue<T>(name: string, fn: () => Promise<T>): Promise<T | undefined> {
-    const prev = this._queueTail.get(name) ?? Promise.resolve();
-    let result: T | undefined;
-    const next = prev.then(async () => {
-      try {
-        result = await fn();
-      } catch {
-        /* swallow — caller gets undefined */
-      }
-    });
-    this._queueTail.set(name, next);
-    next.finally(() => {
-      if (this._queueTail.get(name) === next) {
-        this._queueTail.delete(name);
-      }
-    });
-    await next;
-    return result;
   }
 }
 
