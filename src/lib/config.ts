@@ -10,6 +10,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'hide-enabled-switch'?: boolean;
   'hide-privacy-switch'?: boolean;
   'enable-liveview'?: boolean;
+  'lv-save'?: boolean;
   'disable-thumbnail-refresh'?: boolean;
   'camera-thumbnail-refresh-seconds'?: number;
   'camera-status-polling-seconds'?: number;
@@ -29,6 +30,7 @@ export interface BlinkOptions {
   noEnabledSwitch: boolean;
   noPrivacySwitch: boolean;
   liveView: boolean;
+  lvSave: boolean;
   noThumbnailRefresh: boolean;
   snapshotSeconds: number;
   statusPollingSeconds: number;
@@ -48,6 +50,7 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   noEnabledSwitch: false,
   noPrivacySwitch: false,
   liveView: true,
+  lvSave: false,
   noThumbnailRefresh: false,
   snapshotSeconds: 3600,
   statusPollingSeconds: 30,
@@ -96,6 +99,7 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   checkBoolean('hide-enabled-switch', 'noEnabledSwitch');
   checkBoolean('hide-privacy-switch', 'noPrivacySwitch');
   checkBoolean('enable-liveview', 'liveView');
+  checkBoolean('lv-save', 'lvSave');
   checkBoolean('disable-thumbnail-refresh', 'noThumbnailRefresh');
   checkNumber('camera-thumbnail-refresh-seconds', 'snapshotSeconds');
   checkNumber('camera-status-polling-seconds', 'statusPollingSeconds');

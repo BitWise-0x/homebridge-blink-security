@@ -39,6 +39,7 @@
 | Device                    | Model Type            | Capabilities                                                                                                                                                                                                        |
 | ------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 📷 Blink Outdoor / Indoor | `default`, `catalina` | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
+| 📷 Blink XT / XT2         | `white`, `xt`         | <ul><li>Live view (RTSP)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
 | 📸 Blink Mini             | `owl`                 | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
 | 📸 Blink Mini 2           | `hawk`                | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
 | 🔦 Blink Wired Floodlight | `superior_owl`        | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
@@ -84,7 +85,7 @@ graph TD
 
 ## Features
 
-- **Live view** — IMMI streaming via ffmpeg with automatic keepalive
+- **Live view** — IMMI and RTSP streaming via ffmpeg with automatic keepalive
 - **Security system** — Arm/disarm per network, with optional manual arm switch
 - **Multi-network** — Supports multiple sync modules, each with independent arm/disarm
 - **Motion detection** — Configurable polling interval with debounce
@@ -96,6 +97,7 @@ graph TD
 - **Privacy mode** — Per-camera switch to suppress snapshots when disarmed
 - **Night vision** — IR illuminator toggle (Outdoor/Indoor models)
 - **Clip recording** — Trigger a clip recording via momentary switch
+- **Live View clip saving** — Configurable per-network `lv_save` toggle to save or suppress Live View clips
 - **Audio** — One-way audio (OPUS / AAC-ELD)
 - **OAuth 2.0 + PKCE** — Token refresh and persistent sessions across restarts
 - **2FA** — One-time PIN verification for Blink's two-factor auth
@@ -167,6 +169,7 @@ Blink requires two-factor authentication on first login:
 | `hide-enabled-switch`              | boolean | `false`    | Hide motion enabled/disabled switch           |
 | `hide-privacy-switch`              | boolean | `false`    | Hide privacy mode switch                      |
 | `enable-liveview`                  | boolean | `true`     | Enable IMMI live view streaming               |
+| `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud           |
 | `disable-thumbnail-refresh`        | boolean | `false`    | Disable automatic thumbnail refresh           |
 | `camera-thumbnail-refresh-seconds` | integer | `3600`     | Thumbnail refresh interval in seconds         |
 | `camera-status-polling-seconds`    | integer | `30`       | Status polling interval in seconds            |

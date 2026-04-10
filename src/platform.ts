@@ -75,6 +75,27 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     try {
       this.blink = await this.setupBlink();
 
+      // Sync lv_save (Save Live View Clips) setting for each network
+      for (const network of this.blink.networks.values()) {
+        const current = network.data.lv_save;
+        const desired = this.config.lvSave;
+        this.log.info(
+          `Blink ${network.name} - lv_save: ${current ?? 'unknown'} (config: ${desired})`
+        );
+        if (current !== undefined && current !== desired) {
+          try {
+            await this.blink.api.updateNetworkLvSave(network.data.id, desired);
+            this.log.info(
+              `Blink ${network.name} - lv_save updated to ${desired}`
+            );
+          } catch (e) {
+            this.log.warn(
+              `Blink ${network.name} - Failed to update lv_save: ${e}`
+            );
+          }
+        }
+      }
+
       this.log.info(
         `Blink discovered: ${this.blink.networks.size} networks, ${this.blink.cameras.size} cameras, ${this.blink.doorbells.size} doorbells, ${this.blink.sirens.size} sirens`
       );

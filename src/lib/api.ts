@@ -106,8 +106,8 @@ export class BlinkApi {
     cameraID: number
   ): Promise<LiveViewResponse> {
     return this.client.post<LiveViewResponse>(
-      `/api/v5/accounts/{accountID}/networks/${networkID}/cameras/${cameraID}/liveview`,
-      { intent: 'liveview', motion_event_start_time: '' }
+      `/api/v6/accounts/{accountID}/networks/${networkID}/cameras/${cameraID}/liveview`,
+      { intent: 'liveview', motion_event_start_time: null }
     );
   }
 
@@ -129,7 +129,8 @@ export class BlinkApi {
     owlID: number
   ): Promise<LiveViewResponse> {
     return this.client.post<LiveViewResponse>(
-      `/api/v1/accounts/{accountID}/networks/${networkID}/owls/${owlID}/liveview`
+      `/api/v2/accounts/{accountID}/networks/${networkID}/owls/${owlID}/liveview`,
+      { intent: 'liveview', motion_event_start_time: null }
     );
   }
 
@@ -167,6 +168,36 @@ export class BlinkApi {
     );
   }
 
+  async updateNetworkLvSave(
+    networkID: number,
+    lv_save: boolean
+  ): Promise<CommandResponse> {
+    // Try multiple endpoint/payload combinations — the working one varies by account
+    const attempts: Array<{ path: string; body: unknown }> = [
+      {
+        path: `/network/${networkID}/update`,
+        body: { lv_save },
+      },
+      {
+        path: `/api/v1/accounts/{accountID}/networks/${networkID}/update`,
+        body: { lv_save },
+      },
+      {
+        path: `/network/${networkID}/update`,
+        body: { network: { lv_save } },
+      },
+    ];
+
+    for (const { path, body } of attempts) {
+      try {
+        return await this.client.post<CommandResponse>(path, body);
+      } catch {
+        // Try next combination
+      }
+    }
+    throw new Error(`Failed to update lv_save for network ${networkID}`);
+  }
+
   // --- Doorbell APIs ---
 
   async getDoorbellLiveView(
@@ -174,7 +205,8 @@ export class BlinkApi {
     doorbellID: number
   ): Promise<LiveViewResponse> {
     return this.client.post<LiveViewResponse>(
-      `/api/v1/accounts/{accountID}/networks/${networkID}/doorbells/${doorbellID}/liveview`
+      `/api/v2/accounts/{accountID}/networks/${networkID}/doorbells/${doorbellID}/liveview`,
+      { intent: 'liveview', motion_event_start_time: null }
     );
   }
 
@@ -478,6 +510,7 @@ export interface HomescreenNetwork {
   created_at: string;
   updated_at: string;
   armed: boolean;
+  lv_save?: boolean;
   status?: string;
   syncModule?: SyncModule;
 }

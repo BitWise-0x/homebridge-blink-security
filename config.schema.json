@@ -61,6 +61,12 @@
         "description": "When enabled, clicking a camera feed will start a live stream relay. When disabled, only the last recorded thumbnail is shown.",
         "type": "boolean"
       },
+      "lv-save": {
+        "title": "Save Live View Clips",
+        "default": false,
+        "description": "When enabled, Blink will save a clip for every live view session. When disabled (default), live view streams are not recorded. This controls the per-network 'Save all Live Views' setting on your Blink account.",
+        "type": "boolean"
+      },
       "disable-thumbnail-refresh": {
         "title": "Disable thumbnail auto-refresh",
         "default": false,
@@ -125,7 +131,8 @@
         "hide-privacy-switch",
         "disable-thumbnail-refresh",
         "hide-temperature-sensor",
-        "enable-liveview"
+        "enable-liveview",
+        "lv-save"
       ]
     },
     {
