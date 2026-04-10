@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.9...v1.3.0) (2026-04-10)
+
+### Features
+
+* **api:** upgrade liveview endpoints to match official Blink app and add lv_save control ([cec89e3](https://github.com/BitWise-0x/homebridge-blink-security/commit/cec89e33161e9b29c5c57d0754a2a72374dfdb08))
+
 ## [1.2.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.8...v1.2.9) (2026-04-01)
 
 ### Reverts
