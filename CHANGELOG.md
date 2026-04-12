@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.3.0...v1.4.0) (2026-04-12)
+
+### Features
+
+* **streaming:** add IMMI retry logic, ffmpeg resilience, and v4 homescreen discovery ([e835c55](https://github.com/BitWise-0x/homebridge-blink-security/commit/e835c55281265a38892b41992f7bd0d1619d9c46))
+
 ## [1.3.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.2.9...v1.3.0) (2026-04-10)
 
 ### Features
