@@ -18,7 +18,7 @@ export class BlinkApi {
 
   async getAccountHomescreen(maxTTL = 30): Promise<HomescreenResponse> {
     return this.client.get<HomescreenResponse>(
-      '/api/v3/accounts/{accountID}/homescreen',
+      '/api/v4/accounts/{accountID}/homescreen',
       maxTTL
     );
   }
@@ -488,7 +488,8 @@ export interface HomescreenResponse {
   owls: HomescreenCamera[];
   sirens: HomescreenSiren[];
   chimes: unknown[];
-  doorbell_buttons: HomescreenCamera[];
+  doorbell_buttons?: HomescreenCamera[];
+  doorbells?: HomescreenCamera[];
 }
 
 export interface HomescreenSiren {

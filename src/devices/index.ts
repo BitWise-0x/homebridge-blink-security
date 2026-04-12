@@ -80,11 +80,12 @@ export class Blink {
     ];
 
     let allDoorbells: HomescreenCamera[] = [
+      ...(homescreen.doorbells ?? []),
       ...(homescreen.doorbell_buttons ?? []),
     ];
 
-    // Fallback: discover doorbells from recent media when doorbell_buttons is empty
-    if (allDoorbells.length === 0 && this.networks.size === 0) {
+    // Fallback: discover doorbells from recent media when homescreen has none
+    if (allDoorbells.length === 0) {
       try {
         const mediaRes = await this.api
           .getMediaChange(ttl)
@@ -152,6 +153,46 @@ export class Blink {
         }
       } catch (err) {
         this.log.debug(`Doorbell fallback discovery failed: ${err}`);
+      }
+
+      // Second fallback: if media had no doorbell entries but we already
+      // know about doorbells from a previous session, re-discover them
+      // directly via the config endpoint.
+      if (allDoorbells.length === 0 && this.doorbells.size > 0) {
+        for (const [id, doorbell] of this.doorbells) {
+          try {
+            const config = await this.api.getDoorbellConfig(
+              doorbell.networkID,
+              id,
+              ttl
+            );
+            const raw = config as unknown as Record<string, unknown>;
+            const current = doorbell.data;
+            const entry: HomescreenCamera = {
+              id: current.id,
+              network_id: current.network_id,
+              name: (raw.name as string) ?? current.name,
+              serial: (raw.serial as string) ?? current.serial,
+              fw_version: (raw.fw_version as string) ?? current.fw_version,
+              type: current.type,
+              enabled: (raw.enabled as boolean) ?? current.enabled,
+              thumbnail: (raw.thumbnail as string) ?? current.thumbnail,
+              status: (raw.status as string) ?? current.status,
+              battery: raw.battery as string | undefined,
+              created_at: current.created_at,
+              updated_at: (raw.updated_at as string) ?? current.updated_at,
+            };
+            allDoorbells.push(entry);
+          } catch {
+            // Config fetch failed — keep existing data as-is
+            allDoorbells.push(doorbell.data);
+          }
+        }
+        if (allDoorbells.length > 0) {
+          this.log.info(
+            `Blink fallback restored ${allDoorbells.length} doorbell(s) from cached state.`
+          );
+        }
       }
     }
 

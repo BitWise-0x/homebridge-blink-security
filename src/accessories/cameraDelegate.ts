@@ -27,6 +27,7 @@ const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
 import { ImmiTunnel, RtspToH264Proxy } from '../lib/proxy.js';
+import { sleep } from '../lib/utils.js';
 
 interface SessionInfo {
   address: string;
@@ -61,7 +62,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private ongoingSessions = new Map<string, ChildProcess>();
   private streamTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private streamStartTimes = new Map<string, number>();
+  private streamRetries = new Map<string, number>();
+  private sessionInfoCache = new Map<string, SessionInfo>();
   private lastForcedRefresh = 0;
+
+  private static readonly RETRYABLE_FFMPEG_CODES = new Set([251, 187]);
+  private static readonly MAX_STREAM_RETRIES = 2;
+  private static readonly RETRY_DELAY_MS = 2000;
 
   constructor(
     blinkCamera: BlinkCamera,
@@ -327,13 +334,15 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-probesize',
         '131072',
         '-fflags',
-        '+nobuffer',
+        '+nobuffer+genpts+discardcorrupt',
+        '-err_detect',
+        'ignore_err',
         '-flags',
         'low_delay',
         '-f',
         'mpegts',
         '-i',
-        `tcp://localhost:${rtspProxy.listenPort}`,
+        `tcp://localhost:${rtspProxy.listenPort}?timeout=5000000`,
         '-map',
         '0:v',
         '-vcodec',
@@ -500,6 +509,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     });
     this.ongoingSessions.set(sessionID, ffmpegVideo);
     this.streamStartTimes.set(sessionID, Date.now());
+    this.sessionInfoCache.set(sessionID, sessionInfo);
     this.pendingSessions.delete(sessionID);
 
     // Auto-kill stream after 5 minutes to prevent orphaned processes
@@ -535,15 +545,35 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       }
       this.log.debug(`${this.blinkCamera.name} - ffmpeg ${signal}`);
       if (code !== null && code !== 255) {
-        this.log.error(
-          `${this.blinkCamera.name} - LiveView ERROR: ${signal} with code: ${code}`
-        );
-        this.controller?.forceStopStreamingSession(sessionID);
+        const retries = this.streamRetries.get(sessionID) ?? 0;
+        const isRetryable =
+          BlinkCameraDelegate.RETRYABLE_FFMPEG_CODES.has(code) &&
+          retries < BlinkCameraDelegate.MAX_STREAM_RETRIES;
+
+        if (isRetryable) {
+          this.streamRetries.set(sessionID, retries + 1);
+          this.log.warn(
+            `${this.blinkCamera.name} - LiveView lost (code ${code}), retrying (${retries + 1}/${BlinkCameraDelegate.MAX_STREAM_RETRIES})...`
+          );
+          this.retryImmiStream(sessionID, video, audio).catch(err =>
+            this.log.error(`${this.blinkCamera.name} - Retry failed: ${err}`)
+          );
+        } else {
+          this.streamRetries.delete(sessionID);
+          this.log.error(
+            `${this.blinkCamera.name} - LiveView ERROR: ${signal} with code: ${code}`
+          );
+          this.controller?.forceStopStreamingSession(sessionID);
+        }
+      } else {
+        this.streamRetries.delete(sessionID);
       }
     });
   }
 
   private async stopStream(sessionID: string): Promise<void> {
+    this.streamRetries.delete(sessionID);
+    this.sessionInfoCache.delete(sessionID);
     const startTime = this.streamStartTimes.get(sessionID);
     const elapsed = startTime
       ? ((Date.now() - startTime) / 1000).toFixed(1)
@@ -608,6 +638,99 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         )
         .finally(() => this.blinkCamera.clearThumbnailCache());
     }
+  }
+
+  private async retryImmiStream(
+    sessionID: string,
+    video: VideoInfo,
+    audio: AudioInfo
+  ): Promise<void> {
+    // Clean up old proxy and ffmpeg process
+    const oldProxy = this.proxySessions.get(sessionID);
+    try {
+      await oldProxy?.proxyServer?.stop();
+    } catch {
+      // ignore cleanup errors
+    }
+    const oldFfmpeg = this.ongoingSessions.get(sessionID);
+    if (oldFfmpeg && !oldFfmpeg.killed) {
+      oldFfmpeg.kill('SIGKILL');
+    }
+    this.ongoingSessions.delete(sessionID);
+
+    await sleep(BlinkCameraDelegate.RETRY_DELAY_MS);
+
+    // Request fresh LiveView URL
+    let liveViewURL: string | undefined;
+    try {
+      liveViewURL = await this.blinkCamera.getLiveViewURL(30);
+    } catch (err) {
+      this.log.warn(
+        `${this.blinkCamera.name} - Retry: LiveView request failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+
+    if (!liveViewURL?.startsWith('immis')) {
+      this.log.warn(
+        `${this.blinkCamera.name} - Retry: no IMMI URL returned, giving up`
+      );
+      this.streamRetries.delete(sessionID);
+      this.controller?.forceStopStreamingSession(sessionID);
+      return;
+    }
+
+    // Parse the new IMMI URL and create a fresh tunnel
+    const urlRegex = /([a-z]+):\/\/([^:/]+)(?::[0-9]+)?(\/.*)/;
+    const match = urlRegex.exec(liveViewURL);
+    if (!match) {
+      this.streamRetries.delete(sessionID);
+      this.controller?.forceStopStreamingSession(sessionID);
+      return;
+    }
+
+    const [, protocol, host, path] = match;
+    const pathWithoutQuery = path.split('?')[0].replace(/^\//, '');
+    const connectionId = pathWithoutQuery.replace(/__.*$/, '');
+    const imdsMatch = pathWithoutQuery.match(/__IMDS_(.+)$/);
+    const serial = imdsMatch ? imdsMatch[1].substring(0, 16) : '';
+    const clientIdParam = new URL(
+      liveViewURL.replace('immis://', 'https://')
+    ).searchParams.get('client_id');
+    const clientId = clientIdParam ? parseInt(clientIdParam, 10) : 0;
+
+    const [listenPort] = await reservePorts({ count: 1 });
+    const proxyServer = await this.createImmiTunnel(
+      listenPort,
+      host,
+      clientId,
+      connectionId,
+      serial
+    );
+
+    this.proxySessions.set(sessionID, {
+      protocol,
+      host,
+      path,
+      listenPort,
+      proxyServer,
+      isImmi: true,
+    });
+
+    this.log.info(`${this.blinkCamera.name} - LiveView: ${liveViewURL}`);
+
+    // Restore sessionInfo from cache so startStream can access it
+    const sessionInfo = this.sessionInfoCache.get(sessionID);
+    if (!sessionInfo) {
+      this.log.warn(
+        `${this.blinkCamera.name} - Retry: session info missing, giving up`
+      );
+      this.streamRetries.delete(sessionID);
+      this.controller?.forceStopStreamingSession(sessionID);
+      return;
+    }
+    this.pendingSessions.set(sessionID, sessionInfo);
+
+    await this.startStream(sessionID, video, audio);
   }
 
   private async createImmiTunnel(
