@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write # for checkout
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     name: Release

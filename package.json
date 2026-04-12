@@ -47,7 +47,9 @@
     "prepublishOnly": "npm-run-all prettier lint build",
     "semantic-release": "cross-env semantic-release --no-ci",
     "release": "npm-run-all build semantic-release",
-    "test": "echo \"Error: no test specified\" && exit 0",
+    "test": "vitest run --reporter=verbose",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prepare": "husky",
     "tsc": "tsc --noEmit",
     "dev-setup": "npm run setup-config && npm run setup-log",
@@ -71,6 +73,7 @@
     "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "^8.19.1",
     "@typescript-eslint/parser": "^8.19.1",
+    "@vitest/coverage-v8": "^4.1.4",
     "conventional-changelog-conventionalcommits": "^8.0.0",
     "cross-env": "^7.0.3",
     "eslint": "^9.17.0",
@@ -83,7 +86,8 @@
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
     "semantic-release": "^25.0.3",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.4"
   },
   "types": "./dist/index.d.ts",
   "bugs": {
