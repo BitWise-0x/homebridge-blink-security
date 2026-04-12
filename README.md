@@ -219,6 +219,17 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/e
 
 ## Troubleshooting
 
+### VPN Interference
+
+Blink's authentication servers may reject login requests made through a VPN, returning HTTP 406 with no 2FA code sent. If you're unable to complete initial setup:
+
+1. Disconnect your VPN
+2. Restart the Homebridge child bridge
+3. Complete 2FA verification
+4. You can re-enable your VPN after authentication succeeds — sessions are persisted
+
+### General
+
 If you run into issues, check the [Homebridge troubleshooting wiki](https://github.com/homebridge/homebridge/wiki/Basic-Troubleshooting) first. If the problem persists, [open an issue](https://github.com/BitWise-0x/homebridge-blink-security/issues/new/choose) with as much detail as possible.
 
 <br>
