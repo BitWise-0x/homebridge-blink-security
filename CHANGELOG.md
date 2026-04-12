@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.0...v1.4.1) (2026-04-12)
+
+### Bug Fixes
+
+* **streaming:** remove localrtcpport, increase audio probe, guard output-side retries ([fcbe360](https://github.com/BitWise-0x/homebridge-blink-security/commit/fcbe36066aaaf3af89fac920abccec985dc5f966)), closes [#18](https://github.com/BitWise-0x/homebridge-blink-security/issues/18)
+
 ## [1.4.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.3.0...v1.4.0) (2026-04-12)
 
 ### Features
