@@ -64,6 +64,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private streamStartTimes = new Map<string, number>();
   private streamRetries = new Map<string, number>();
   private sessionInfoCache = new Map<string, SessionInfo>();
+  private outputErrorSessions = new Set<string>();
   private lastForcedRefresh = 0;
 
   private static readonly RETRYABLE_FFMPEG_CODES = new Set([251, 187]);
@@ -330,9 +331,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-loglevel',
         'warning',
         '-analyzeduration',
-        '0',
+        '1500000',
         '-probesize',
-        '131072',
+        '262144',
         '-fflags',
         '+nobuffer+genpts+discardcorrupt',
         '-err_detect',
@@ -452,7 +453,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     }
 
     ffmpegArgs.push(
-      `${targetProtocol}://${address}:${videoPort}?rtcpport=${videoPort}&localrtcpport=${videoPort}&pkt_size=${video.mtu}`
+      `${targetProtocol}://${address}:${videoPort}?rtcpport=${videoPort}&pkt_size=${video.mtu}`
     );
 
     // Audio output — transcode AAC from camera to OPUS for HomeKit
@@ -498,7 +499,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       }
 
       ffmpegArgs.push(
-        `${audioProtocol}://${address}:${audioPort}?rtcpport=${audioPort}&localrtcpport=${audioPort}&pkt_size=188`
+        `${audioProtocol}://${address}:${audioPort}?rtcpport=${audioPort}&pkt_size=188`
       );
     }
 
@@ -525,11 +526,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       }, MAX_STREAM_MS)
     );
 
-    ffmpegVideo.stderr?.on('data', (data: Buffer) =>
-      this.log.debug(
-        `${this.blinkCamera.name} - ffmpeg: ${String(data).trim()}`
-      )
-    );
+    ffmpegVideo.stderr?.on('data', (data: Buffer) => {
+      const msg = String(data).trim();
+      this.log.debug(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
+      if (msg.includes('bind failed') || msg.includes('Error opening output')) {
+        this.outputErrorSessions.add(sessionID);
+      }
+    });
 
     ffmpegVideo.on('error', error => {
       this.log.error(
@@ -546,9 +549,12 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       this.log.debug(`${this.blinkCamera.name} - ffmpeg ${signal}`);
       if (code !== null && code !== 255) {
         const retries = this.streamRetries.get(sessionID) ?? 0;
+        const isOutputError = this.outputErrorSessions.has(sessionID);
+        this.outputErrorSessions.delete(sessionID);
         const isRetryable =
           BlinkCameraDelegate.RETRYABLE_FFMPEG_CODES.has(code) &&
-          retries < BlinkCameraDelegate.MAX_STREAM_RETRIES;
+          retries < BlinkCameraDelegate.MAX_STREAM_RETRIES &&
+          !isOutputError;
 
         if (isRetryable) {
           this.streamRetries.set(sessionID, retries + 1);
@@ -574,6 +580,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private async stopStream(sessionID: string): Promise<void> {
     this.streamRetries.delete(sessionID);
     this.sessionInfoCache.delete(sessionID);
+    this.outputErrorSessions.delete(sessionID);
     const startTime = this.streamStartTimes.get(sessionID);
     const elapsed = startTime
       ? ((Date.now() - startTime) / 1000).toFixed(1)
