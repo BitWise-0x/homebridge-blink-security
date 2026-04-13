@@ -548,7 +548,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     ffmpegVideo.stderr?.on('data', (data: Buffer) => {
       const msg = String(data).trim();
-      this.log.debug(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
+      this.log.info(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
       if (msg.includes('bind failed') || msg.includes('Error opening output')) {
         this.outputErrorSessions.add(sessionID);
       }
