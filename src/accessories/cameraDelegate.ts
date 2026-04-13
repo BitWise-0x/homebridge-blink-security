@@ -514,6 +514,14 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     // treats TCP as non-seekable and skips audio PMT scanning.
     if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
       const tunnel = rtspProxy.proxyServer as ImmiTunnel;
+      if (!tunnel.isAlive) {
+        this.log.warn(
+          `${this.blinkCamera.name} - IMMI tunnel closed before stream start, aborting`
+        );
+        ffmpegVideo.kill('SIGKILL');
+        this.controller?.forceStopStreamingSession(sessionID);
+        return;
+      }
       tunnel.dataStream?.pipe(ffmpegVideo.stdin!);
       ffmpegVideo.stdin?.on('error', () => {
         // EPIPE expected when FFmpeg exits before stream ends

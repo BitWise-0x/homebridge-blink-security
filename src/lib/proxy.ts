@@ -621,6 +621,11 @@ export class ImmiTunnel {
     return this._stripper;
   }
 
+  /** Returns true if the TLS connection to the IMMI server is still open. */
+  get isAlive(): boolean {
+    return !!this._tlsSocket && !this._tlsSocket.destroyed;
+  }
+
   /**
    * Establish TLS to the IMMI server, send the handshake, then start
    * a local TCP server for ffmpeg to connect to.
