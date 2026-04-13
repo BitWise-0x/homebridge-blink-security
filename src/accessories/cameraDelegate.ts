@@ -331,11 +331,11 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-loglevel',
         'warning',
         '-analyzeduration',
-        '0',
+        '2000000',
         '-probesize',
-        '32768',
+        '262144',
         '-fflags',
-        '+nobuffer+genpts+discardcorrupt',
+        '+genpts+discardcorrupt',
         '-err_detect',
         'ignore_err',
         '-flags',
@@ -343,7 +343,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-f',
         'mpegts',
         '-i',
-        `tcp://localhost:${rtspProxy.listenPort}?timeout=5000000`,
+        'pipe:0',
         '-map',
         '0:v',
         '-vcodec',
@@ -465,9 +465,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-map',
         '0:a:0?',
         '-codec:a',
-        'libopus',
-        '-application',
-        'lowdelay',
+        'libfdk_aac',
+        '-profile:a',
+        'aac_eld',
         '-flags',
         '+global_header',
         '-ar',
@@ -508,6 +508,18 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const ffmpegVideo = spawn(pathToFfmpeg || 'ffmpeg', ffmpegArgs, {
       env: process.env,
     });
+
+    // For IMMI streams: pipe the stripped MPEG-TS to FFmpeg's stdin.
+    // This avoids the TCP seekability issue where FFmpeg's MPEG-TS demuxer
+    // treats TCP as non-seekable and skips audio PMT scanning.
+    if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
+      const tunnel = rtspProxy.proxyServer as ImmiTunnel;
+      tunnel.dataStream?.pipe(ffmpegVideo.stdin!);
+      ffmpegVideo.stdin?.on('error', () => {
+        // EPIPE expected when FFmpeg exits before stream ends
+      });
+    }
+
     this.ongoingSessions.set(sessionID, ffmpegVideo);
     this.streamStartTimes.set(sessionID, Date.now());
     this.sessionInfoCache.set(sessionID, sessionInfo);

@@ -481,8 +481,8 @@ class ImmiFrameStripper extends Transform {
             this._payloadRemaining > 0 && this._buffer.length > 0
               ? ` preview=${this._buffer.subarray(0, Math.min(16, this._payloadRemaining, this._buffer.length)).toString('hex')}`
               : '';
-          this._log?.info(
-            `IMMI unknown frame type=0x${this._currentMsgType.toString(16).padStart(2, '0')} seq=${seq} len=${this._payloadRemaining}${preview}`
+          this._log?.debug(
+            `IMMI frame type=0x${this._currentMsgType.toString(16).padStart(2, '0')} seq=${seq} len=${this._payloadRemaining}${preview}`
           );
         }
       }
@@ -616,10 +616,14 @@ export class ImmiTunnel {
     return this._listenPort;
   }
 
+  /** Exposed for stdin piping — returns the stripped MPEG-TS stream. */
+  get dataStream(): Transform | undefined {
+    return this._stripper;
+  }
+
   /**
    * Establish TLS to the IMMI server, send the handshake, then start
-   * a local TCP server for ffmpeg to connect to. By the time ffmpeg
-   * connects, the TLS pipe should already have data buffered.
+   * a local TCP server for ffmpeg to connect to.
    */
   async start(): Promise<net.Server | undefined> {
     if (this._server?.listening) {
@@ -670,19 +674,16 @@ export class ImmiTunnel {
         firstData = false;
       }
     });
-    // Don't start piping until ffmpeg connects — ensures ffmpeg sees the
-    // initial PAT/PMT tables that define audio PIDs in the MPEG-TS stream.
-    tlsSocket.pause();
+    tlsSocket.pipe(this._stripper);
 
-    // Step 5: Start TCP server for ffmpeg — pipe stripper output to ffmpeg
+    // Step 5: Start TCP server for ffmpeg — pipe stripper output to ffmpeg.
+    // Also used as fallback; primary path is stdin piping via dataStream getter.
     this._server = net.createServer(tcpSocket => {
       this._tcpSocket = tcpSocket;
       this._log?.debug(
         `IMMI ffmpeg client connected on port ${this._listenPort}`
       );
-      tlsSocket.pipe(this._stripper!);
       this._stripper!.pipe(tcpSocket);
-      tlsSocket.resume();
 
       tcpSocket.on('error', () => {
         this._stopKeepAlive();
