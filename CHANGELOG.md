@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.0-beta.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.2...v1.5.0-beta.3) (2026-04-13)
+
+### Bug Fixes
+
+* **streaming:** raise IMMI ffmpeg loglevel to info for audio diagnostics ([381a2a6](https://github.com/BitWise-0x/homebridge-blink-security/commit/381a2a6c3c1ac2fa35a9f2aeb8b1bc9af48115fc))
+
 ## [1.5.0-beta.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.1...v1.5.0-beta.2) (2026-04-13)
 
 ### Bug Fixes
