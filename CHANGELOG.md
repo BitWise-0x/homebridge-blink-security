@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.1...v1.4.2) (2026-04-13)
+
+### Bug Fixes
+
+* **streaming:** make audio mapping optional, increase probe window, defer TLS piping ([e654bab](https://github.com/BitWise-0x/homebridge-blink-security/commit/e654babf0f6358604bd71f587a557b0e89d90365)), closes [#18](https://github.com/BitWise-0x/homebridge-blink-security/issues/18)
+
 ## [1.4.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.0...v1.4.1) (2026-04-12)
 
 ### Bug Fixes
