@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.3...v1.5.0-beta.1) (2026-04-13)
+
+### Features
+
+* **streaming:** enable one-way audio for IMMI cameras ([866b6f2](https://github.com/BitWise-0x/homebridge-blink-security/commit/866b6f2598968686b8a6e8545a05803e57adf8a4))
+
 ## [1.4.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.2...v1.4.3) (2026-04-13)
 
 ### Bug Fixes
