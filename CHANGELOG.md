@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.0-beta.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.3...v1.5.0-beta.4) (2026-04-13)
+
+### Bug Fixes
+
+* **streaming:** raise ffmpeg stderr logging to info for diagnostic visibility ([284b955](https://github.com/BitWise-0x/homebridge-blink-security/commit/284b955d0ecd60e041708181ead14a8e14253ac6)), closes [#18](https://github.com/BitWise-0x/homebridge-blink-security/issues/18)
+
 ## [1.5.0-beta.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.2...v1.5.0-beta.3) (2026-04-13)
 
 ### Bug Fixes
