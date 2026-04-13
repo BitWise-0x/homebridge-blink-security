@@ -62,23 +62,39 @@ graph TD
         acc_cam["<b>Camera</b><br>live view · snapshots<br>motion · battery · temp"]
         acc_door["<b>Doorbell</b><br>press notification<br>+ camera features"]
         acc_siren["<b>Siren</b><br>on / off"]
+
+        subgraph Streaming Pipeline
+            delegate["<b>CameraDelegate</b><br>stream lifecycle"]
+            immi_proxy["<b>ImmiTunnel</b><br>MPEG-TS over TLS"]
+            rtsp_proxy["<b>RtspToH264Proxy</b><br>RTSP de-frame → MPEG-TS"]
+            ffmpeg["<b>FFmpeg</b><br>H.264 + OPUS → SRTP"]
+        end
     end
 
     subgraph Blink Cloud
-        auth["<b>OAuth 2.0 + PKCE</b><br>+ 2FA PIN"]
+        auth["<b>OAuth 2.0 + PKCE</b><br>+ 2FA PIN · session persist"]
         api["<b>Blink REST API</b><br>immedia-semi.com"]
-        immi["<b>IMMI Streaming</b><br>H.264 via ffmpeg"]
+        immi_srv["<b>IMMI Server</b><br>TLS :443"]
+        rtsp_srv["<b>RTSP Server</b><br>TLS :443"]
     end
 
     Home <-->|"HomeKit"| acc_sec
     Home <-->|"HomeKit"| acc_cam
     Home <-->|"HomeKit"| acc_door
     Home <-->|"HomeKit"| acc_siren
+
     platform --> acc_sec & acc_cam & acc_door & acc_siren
-    platform -->|"polling 10s<br>commands"| api
-    platform -->|"token refresh<br>session persist"| auth
-    acc_cam & acc_door -->|"live view"| immi
+    platform -->|"polling<br>status · motion · thumbs"| api
+    platform -->|"token refresh"| auth
     auth --> api
+
+    acc_cam & acc_door --> delegate
+    delegate -->|"Mini / Doorbell /<br>Outdoor / Indoor"| immi_proxy
+    delegate -->|"XT / XT2"| rtsp_proxy
+    immi_proxy -->|"TLS"| immi_srv
+    rtsp_proxy -->|"TLS"| rtsp_srv
+    immi_proxy & rtsp_proxy -->|"MPEG-TS"| ffmpeg
+    ffmpeg -->|"SRTP"| Home
 ```
 
 <br>
@@ -98,7 +114,7 @@ graph TD
 - **Night vision** — IR illuminator toggle (Outdoor/Indoor models)
 - **Clip recording** — Trigger a clip recording via momentary switch
 - **Live View clip saving** — Configurable per-network `lv_save` toggle to save or suppress Live View clips
-- **Audio** — One-way audio (OPUS / AAC-ELD)
+- **Audio** — One-way audio (OPUS / AAC-ELD) (work in progress)
 - **OAuth 2.0 + PKCE** — Token refresh and persistent sessions across restarts
 - **2FA** — One-time PIN verification for Blink's two-factor auth
 - **Snapshot fallback** — Streams the last thumbnail when live view is unavailable
