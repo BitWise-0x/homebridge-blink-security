@@ -406,12 +406,23 @@ export class RtspToH264Proxy {
 // Bytes 5-8: payload length (uint32 BE)
 const IMMI_HEADER_SIZE = 9;
 const IMMI_MSG_VIDEO = 0x00;
-const IMMI_TS_SYNC = 0x47; // MPEG-TS sync byte
+// MPEG-TS sync byte (0x47) — retained for reference but no longer used
+// for frame filtering since IMMI/MPEG-TS boundaries don't always align.
 
 class ImmiFrameStripper extends Transform {
   private _buffer: Buffer = Buffer.alloc(0);
   private _payloadRemaining = 0;
   private _currentMsgType = -1;
+  private _seenMsgTypes = new Map<
+    number,
+    { count: number; totalBytes: number }
+  >();
+  private _log?: Logger;
+
+  constructor(log?: Logger) {
+    super();
+    this._log = log;
+  }
 
   override _transform(
     chunk: Buffer,
@@ -441,22 +452,48 @@ class ImmiFrameStripper extends Transform {
 
       // Parse header
       this._currentMsgType = this._buffer[0];
+      const seq = this._buffer.readUInt32BE(1);
       this._payloadRemaining = this._buffer.readUInt32BE(5);
       this._buffer = this._buffer.subarray(IMMI_HEADER_SIZE);
 
-      // For video frames, peek at first byte to verify MPEG-TS sync
-      if (
-        this._currentMsgType === IMMI_MSG_VIDEO &&
-        this._payloadRemaining > 0 &&
-        this._buffer.length > 0 &&
-        this._buffer[0] !== IMMI_TS_SYNC
-      ) {
-        // Not MPEG-TS — skip this frame
-        this._currentMsgType = -1;
+      // Track frame types for diagnostics
+      const stats = this._seenMsgTypes.get(this._currentMsgType);
+      if (stats) {
+        stats.count++;
+        stats.totalBytes += this._payloadRemaining;
+      } else {
+        this._seenMsgTypes.set(this._currentMsgType, {
+          count: 1,
+          totalBytes: this._payloadRemaining,
+        });
+        // Log first occurrence of each unknown frame type
+        if (
+          this._currentMsgType !== IMMI_MSG_VIDEO &&
+          this._currentMsgType !== 0x0a &&
+          this._currentMsgType !== 0x12
+        ) {
+          const preview =
+            this._payloadRemaining > 0 && this._buffer.length > 0
+              ? ` preview=${this._buffer.subarray(0, Math.min(16, this._payloadRemaining, this._buffer.length)).toString('hex')}`
+              : '';
+          this._log?.info(
+            `IMMI unknown frame type=0x${this._currentMsgType.toString(16).padStart(2, '0')} seq=${seq} len=${this._payloadRemaining}${preview}`
+          );
+        }
       }
+
+      // Forward all VIDEO frames — the MPEG-TS stream contains both
+      // video and audio PIDs. Previously we checked for 0x47 sync byte
+      // but that rejected frames where the IMMI/MPEG-TS boundaries
+      // didn't align, dropping PAT/PMT tables needed for audio detection.
     }
 
     done();
+  }
+
+  /** Return summary of all frame types seen during this session. */
+  getFrameStats(): Map<number, { count: number; totalBytes: number }> {
+    return this._seenMsgTypes;
   }
 
   override _flush(done: TransformCallback): void {
@@ -614,8 +651,11 @@ export class ImmiTunnel {
       }
     }, 10000);
 
-    // Step 4: Pipe TLS data through frame stripper (buffers until TCP client connects)
-    this._stripper = new ImmiFrameStripper();
+    // Step 4: Pipe TLS data through frame stripper to extract clean MPEG-TS.
+    // The IMMI VIDEO frames (type 0x00) contain MPEG-TS with multiplexed
+    // H.264 video and AAC audio. The stripper removes IMMI frame headers
+    // and control frames, passing only the MPEG-TS payload to ffmpeg.
+    this._stripper = new ImmiFrameStripper(this._log);
     let firstData = true;
     tlsSocket.on('data', (chunk: Buffer) => {
       if (firstData) {
@@ -625,7 +665,9 @@ export class ImmiTunnel {
         firstData = false;
       }
     });
-    tlsSocket.pipe(this._stripper);
+    // Don't start piping until ffmpeg connects — ensures ffmpeg sees the
+    // initial PAT/PMT tables that define audio PIDs in the MPEG-TS stream.
+    tlsSocket.pause();
 
     // Step 5: Start TCP server for ffmpeg — pipe stripper output to ffmpeg
     this._server = net.createServer(tcpSocket => {
@@ -633,7 +675,9 @@ export class ImmiTunnel {
       this._log?.debug(
         `IMMI ffmpeg client connected on port ${this._listenPort}`
       );
+      tlsSocket.pipe(this._stripper!);
       this._stripper!.pipe(tcpSocket);
+      tlsSocket.resume();
 
       tcpSocket.on('error', () => {
         this._stopKeepAlive();
