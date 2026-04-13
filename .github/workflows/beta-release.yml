@@ -3,9 +3,14 @@ on:
   push:
     branches:
       - beta
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # for checkout
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
