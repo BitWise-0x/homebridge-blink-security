@@ -418,6 +418,7 @@ class ImmiFrameStripper extends Transform {
     { count: number; totalBytes: number }
   >();
   private _log?: Logger;
+  private _firstVideoLogged = false;
 
   constructor(log?: Logger) {
     super();
@@ -438,6 +439,10 @@ class ImmiFrameStripper extends Transform {
         const toConsume = Math.min(this._payloadRemaining, this._buffer.length);
         // Only forward VIDEO frames that contain MPEG-TS data
         if (this._currentMsgType === IMMI_MSG_VIDEO) {
+          if (!this._firstVideoLogged) {
+            this._firstVideoLogged = true;
+            this._log?.info(`IMMI first video frame: ${toConsume} bytes`);
+          }
           this.push(this._buffer.subarray(0, toConsume));
         }
         this._buffer = this._buffer.subarray(toConsume);
