@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.2...v1.4.3) (2026-04-13)
+
+### Bug Fixes
+
+* **streaming:** eliminate probe delay blocking HomeKit video delivery ([a6a078d](https://github.com/BitWise-0x/homebridge-blink-security/commit/a6a078d406d376c6893e6fd02d90e69150634253)), closes [#18](https://github.com/BitWise-0x/homebridge-blink-security/issues/18)
+
 ## [1.4.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.1...v1.4.2) (2026-04-13)
 
 ### Bug Fixes

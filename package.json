@@ -1,7 +1,7 @@
 {
   "displayName": "Blink Security",
   "name": "@jackietreeh0rn/homebridge-blink-security",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Homebridge plugin for Amazon Blink security cameras",
   "keywords": [
     "homebridge",
