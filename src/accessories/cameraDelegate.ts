@@ -329,7 +329,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       ffmpegArgs.push(
         '-hide_banner',
         '-loglevel',
-        'warning',
+        'info',
         '-analyzeduration',
         '2000000',
         '-probesize',
