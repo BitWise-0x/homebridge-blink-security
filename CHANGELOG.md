@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.1-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0...v1.5.1-beta.1) (2026-04-14)
+
+### Bug Fixes
+
+* **logs:** clarify thumbnail refresh logging to reflect actual cadence ([a8a9dd7](https://github.com/BitWise-0x/homebridge-blink-security/commit/a8a9dd7ef27be57416de3b045cd71df0d6760874)), closes [#20](https://github.com/BitWise-0x/homebridge-blink-security/issues/20)
+
 ## [1.5.0-beta.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.4...v1.5.0-beta.5) (2026-04-14)
 
 ### Bug Fixes
