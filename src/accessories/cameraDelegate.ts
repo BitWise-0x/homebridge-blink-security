@@ -100,8 +100,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
           `${this.blinkCamera.name} - Snapshot: 0 bytes (${request.width}x${request.height}) — ${url ? `URL: ${url}` : 'no thumbnail URL'}`
         );
       } else {
-        this.log.info(
-          `${this.blinkCamera.name} - Snapshot: ${size} bytes (${request.width}x${request.height})`
+        this.log.debug(
+          `${this.blinkCamera.name} - Snapshot served (cached): ${size} bytes (${request.width}x${request.height})`
         );
       }
       callback(undefined, bytes ?? Buffer.alloc(0));

@@ -436,6 +436,10 @@ export class Blink {
 
           camera.thumbnailCreatedAt = Date.now();
 
+          this.log.info(
+            `${camera.name} - Cloud thumbnail refresh (interval: ${this.snapshotRate}s)`
+          );
+
           const updateCamera = camera.isCameraMini
             ? () =>
                 this.api.updateOwlThumbnail(camera.networkID, camera.cameraID)
@@ -453,6 +457,12 @@ export class Blink {
           );
 
           return true;
+        }
+        if (eligible) {
+          const secsRemaining = Math.ceil((lastSnapshot - Date.now()) / 1000);
+          this.log.debug(
+            `${camera.name} - Cloud refresh skipped (next in ${secsRemaining}s)`
+          );
         }
         return false;
       })
@@ -581,6 +591,10 @@ export class Blink {
 
       doorbell.thumbnailCreatedAt = Date.now();
 
+      this.log.info(
+        `${doorbell.name} - Cloud thumbnail refresh (interval: ${this.snapshotRate}s)`
+      );
+
       await this.api.lock(
         `refreshDoorbellThumbnail(${networkID}, ${doorbellID})`,
         async () => {
@@ -591,6 +605,11 @@ export class Blink {
       );
 
       await this.refreshData(true);
+    } else if (eligible) {
+      const secsRemaining = Math.ceil((lastSnapshot - Date.now()) / 1000);
+      this.log.debug(
+        `${doorbell.name} - Cloud refresh skipped (next in ${secsRemaining}s)`
+      );
     }
   }
 }
