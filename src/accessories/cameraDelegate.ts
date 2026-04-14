@@ -546,11 +546,22 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       }, MAX_STREAM_MS)
     );
 
+    let zeroChannelAudioWarned = false;
     ffmpegVideo.stderr?.on('data', (data: Buffer) => {
       const msg = String(data).trim();
       this.log.info(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
       if (msg.includes('bind failed') || msg.includes('Error opening output')) {
         this.outputErrorSessions.add(sessionID);
+      }
+      if (
+        !zeroChannelAudioWarned &&
+        msg.includes('Audio:') &&
+        msg.includes('0 channels')
+      ) {
+        zeroChannelAudioWarned = true;
+        this.log.warn(
+          `${this.blinkCamera.name} - Camera reports audio with 0 channels, audio output may not work for this session`
+        );
       }
     });
 
