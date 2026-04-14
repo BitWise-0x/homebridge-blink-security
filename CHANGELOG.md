@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.0-beta.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.4...v1.5.0-beta.5) (2026-04-14)
+
+### Bug Fixes
+
+* **streaming:** warn when camera reports 0-channel audio metadata ([1d56815](https://github.com/BitWise-0x/homebridge-blink-security/commit/1d56815d0b312cfc0544e88d42be7768d081bbd8)), closes [#18](https://github.com/BitWise-0x/homebridge-blink-security/issues/18)
+
 ## [1.5.0-beta.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.3...v1.5.0-beta.4) (2026-04-13)
 
 ### Bug Fixes
