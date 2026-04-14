@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.0-beta.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.3...v1.5.0-beta.4) (2026-04-13)
+
+### Bug Fixes
+
+* **streaming:** raise ffmpeg stderr logging to info for diagnostic visibility ([284b955](https://github.com/BitWise-0x/homebridge-blink-security/commit/284b955d0ecd60e041708181ead14a8e14253ac6)), closes [#18](https://github.com/BitWise-0x/homebridge-blink-security/issues/18)
+
+## [1.5.0-beta.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.2...v1.5.0-beta.3) (2026-04-13)
+
+### Bug Fixes
+
+* **streaming:** raise IMMI ffmpeg loglevel to info for audio diagnostics ([381a2a6](https://github.com/BitWise-0x/homebridge-blink-security/commit/381a2a6c3c1ac2fa35a9f2aeb8b1bc9af48115fc))
+
+## [1.5.0-beta.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0-beta.1...v1.5.0-beta.2) (2026-04-13)
+
+### Bug Fixes
+
+* **streaming:** guard against dead IMMI tunnel before stdin pipe ([3479c64](https://github.com/BitWise-0x/homebridge-blink-security/commit/3479c64a7b7fb21b6c8945f94b62d6455f16ee0c))
+
+## [1.5.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.3...v1.5.0-beta.1) (2026-04-13)
+
+### Features
+
+* **streaming:** enable one-way audio for IMMI cameras ([866b6f2](https://github.com/BitWise-0x/homebridge-blink-security/commit/866b6f2598968686b8a6e8545a05803e57adf8a4))
+
 ## [1.4.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.4.2...v1.4.3) (2026-04-13)
 
 ### Bug Fixes
