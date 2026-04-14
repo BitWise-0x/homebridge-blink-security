@@ -36,15 +36,15 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 
 <div align="center">
 
-| Device                    | Model Type            | Capabilities                                                                                                                                                                                                        |
-| ------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 📷 Blink Outdoor / Indoor | `default`, `catalina` | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
-| 📷 Blink XT / XT2         | `white`, `xt`         | <ul><li>Live view (RTSP)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
-| 📸 Blink Mini             | `owl`                 | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
-| 📸 Blink Mini 2           | `hawk`                | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
-| 🔦 Blink Wired Floodlight | `superior_owl`        | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                |
-| 🚪 Blink Video Doorbell   | `lotus`               | <ul><li>Live view (IMMI)</li><li>Motion sensor</li><li>Snapshots</li><li>Doorbell press notification</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                            |
-| 🚨 Blink Siren            | siren                 | <ul><li>On/off switch</li></ul>                                                                                                                                                                                     |
+| Device                    | Model Type            | Capabilities                                                                                                                                                                                                                    |
+| ------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 📷 Blink Outdoor / Indoor | `default`, `catalina` | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>     |
+| 📷 Blink XT / XT2         | `white`, `xt`         | <ul><li>Live view (RTSP, video only)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
+| 📸 Blink Mini             | `owl`                 | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
+| 📸 Blink Mini 2           | `hawk`                | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
+| 🔦 Blink Wired Floodlight | `superior_owl`        | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
+| 🚪 Blink Video Doorbell   | `lotus`               | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Doorbell press notification</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                |
+| 🚨 Blink Siren            | siren                 | <ul><li>On/off switch</li></ul>                                                                                                                                                                                                 |
 
 </div>
 
@@ -67,7 +67,7 @@ graph TD
             delegate["<b>CameraDelegate</b><br>stream lifecycle"]
             immi_proxy["<b>ImmiTunnel</b><br>MPEG-TS over TLS"]
             rtsp_proxy["<b>RtspToH264Proxy</b><br>RTSP de-frame → MPEG-TS"]
-            ffmpeg["<b>FFmpeg</b><br>H.264 + OPUS → SRTP"]
+            ffmpeg["<b>FFmpeg</b><br>H.264 + AAC-ELD → SRTP"]
         end
     end
 
@@ -101,7 +101,7 @@ graph TD
 
 ## Features
 
-- **Live view** — IMMI and RTSP streaming via ffmpeg with automatic keepalive
+- **Live view** — IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras)
 - **Security system** — Arm/disarm per network, with optional manual arm switch
 - **Multi-network** — Supports multiple sync modules, each with independent arm/disarm
 - **Motion detection** — Configurable polling interval with debounce
@@ -114,7 +114,7 @@ graph TD
 - **Night vision** — IR illuminator toggle (Outdoor/Indoor models)
 - **Clip recording** — Trigger a clip recording via momentary switch
 - **Live View clip saving** — Configurable per-network `lv_save` toggle to save or suppress Live View clips
-- **Audio** — One-way audio (OPUS / AAC-ELD) (work in progress)
+- **One-way audio** — Listen-in on IMMI cameras (Mini, Mini 2, Outdoor/Indoor, Doorbell, Floodlight) transcoded to AAC-ELD for HomeKit
 - **OAuth 2.0 + PKCE** — Token refresh and persistent sessions across restarts
 - **2FA** — One-time PIN verification for Blink's two-factor auth
 - **Snapshot fallback** — Streams the last thumbnail when live view is unavailable
@@ -202,6 +202,8 @@ Blink requires two-factor authentication on first login:
 - Node.js 18.20.4+, 20.18.0+, 22.10.0+, or 24.0.0+
 - Homebridge 1.8.0+ or 2.0.0-beta+
 
+FFmpeg is bundled via the [`ffmpeg-for-homebridge`](https://github.com/homebridge/ffmpeg-for-homebridge) dependency — no separate install is needed, and it ships with `libfdk_aac` enabled for AAC-ELD audio.
+
 ### Setup
 
 ```sh
@@ -235,6 +237,10 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/e
 
 ## Troubleshooting
 
+### No Audio in Live View
+
+One-way audio is supported on IMMI cameras (Mini, Mini 2, Outdoor/Indoor, Doorbell, Wired Floodlight). XT / XT2 cameras use RTSP and are video-only. If audio is missing on a supported camera, enable `"logging": "debug"` in config to see FFmpeg's track detection output.
+
 ### VPN Interference
 
 Blink's authentication servers may reject login requests made through a VPN, returning HTTP 406 with no 2FA code sent. If you're unable to complete initial setup:
@@ -258,7 +264,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 
 ## Useful Resources
 
-> **Read the full write-up:** [Homebridge SmartRent & Blink](https://blog.bitwisesolutions.co/blog/homebridge-smartrent-blink) — covers setup, configuration, and integration details for both plugins.
+> **Read the full write-up:** [Homebridge SmartRent & Blink](https://blog.bitwisesolutions.co/blog/homebridge-smartrent-blink) — an architectural deep-dive into how both plugins map their respective APIs into HomeKit (HAP service composition, IMMI streaming, OAuth/2FA, motion polling).
 
 - [MattTW/BlinkMonitorProtocol](https://github.com/MattTW/BlinkMonitorProtocol) — Blink API documentation
 - [fronzbot/blinkpy](https://github.com/fronzbot/blinkpy) — Python Blink library (Home Assistant)
