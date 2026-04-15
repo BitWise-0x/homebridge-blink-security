@@ -66,6 +66,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private streamRetries = new Map<string, number>();
   private sessionInfoCache = new Map<string, SessionInfo>();
   private outputErrorSessions = new Set<string>();
+  private audioDisabledSessions = new Set<string>();
   private lastForcedRefresh = 0;
 
   private static readonly RETRYABLE_FFMPEG_CODES = new Set([251, 187]);
@@ -318,8 +319,11 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const videoPort = sessionInfo.videoPort;
     const videoSRTP = sessionInfo.videoSRTP.toString('base64');
 
+    const phase = this.audioDisabledSessions.has(sessionID)
+      ? 'RESTART (video-only)'
+      : 'START';
     this.log.info(
-      `${this.blinkCamera.name} - LiveView START (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps)`
+      `${this.blinkCamera.name} - LiveView ${phase} (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps)`
     );
 
     const ffmpegArgs: string[] = [];
@@ -327,8 +331,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     // IMMI streams have audio; RTSP XT streams are video-only; static fallback has none.
     // Audio output is opt-in via config because some camera privacy settings send
     // malformed audio metadata (0 channels) that stalls the ffmpeg pipeline.
+    // A session that previously hit 0-channel audio is marked as audio-disabled
+    // and stays that way for the rest of the session.
     const hasAudio =
-      this.audioEnabled && !!rtspProxy?.proxyServer && !rtspProxy?.isRtsp;
+      this.audioEnabled &&
+      !this.audioDisabledSessions.has(sessionID) &&
+      !!rtspProxy?.proxyServer &&
+      !rtspProxy?.isRtsp;
 
     if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
       // IMMI protocol — MPEG-TS input from local tunnel
@@ -552,7 +561,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       }, MAX_STREAM_MS)
     );
 
-    let zeroChannelAudioWarned = false;
+    let zeroChannelAudioHandled = false;
     ffmpegVideo.stderr?.on('data', (data: Buffer) => {
       const msg = String(data).trim();
       this.log.debug(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
@@ -560,13 +569,19 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         this.outputErrorSessions.add(sessionID);
       }
       if (
-        !zeroChannelAudioWarned &&
+        !zeroChannelAudioHandled &&
+        hasAudio &&
         msg.includes('Audio:') &&
         msg.includes('0 channels')
       ) {
-        zeroChannelAudioWarned = true;
+        zeroChannelAudioHandled = true;
         this.log.warn(
-          `${this.blinkCamera.name} - Camera reports audio with 0 channels, audio output may not work for this session`
+          `${this.blinkCamera.name} - Audio unavailable, restarting Live View without audio. Enable Audio Streaming in the Blink app (Device Settings → Privacy) to use audio.`
+        );
+        this.restartWithoutAudio(sessionID, video, audio).catch(err =>
+          this.log.error(
+            `${this.blinkCamera.name} - Audio-disable restart failed: ${err}`
+          )
         );
       }
     });
@@ -614,10 +629,67 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     });
   }
 
+  /**
+   * Respawn ffmpeg without audio mapping while keeping the IMMI tunnel alive.
+   * Used when the camera sends 0-channel audio metadata (audio disabled in
+   * Blink privacy settings), which would otherwise stall the encoder and
+   * block video delivery to HomeKit.
+   */
+  private async restartWithoutAudio(
+    sessionID: string,
+    video: VideoInfo,
+    audio: AudioInfo
+  ): Promise<void> {
+    this.audioDisabledSessions.add(sessionID);
+
+    // Unpipe the IMMI stripper from the old ffmpeg stdin so it's ready to
+    // feed the replacement ffmpeg. Then kill the stalled ffmpeg — its exit
+    // handler will run but with SIGKILL/null code it just clears the retry
+    // counter and does nothing else.
+    const proxy = this.proxySessions.get(sessionID);
+    const tunnel =
+      proxy?.isImmi && proxy.proxyServer
+        ? (proxy.proxyServer as ImmiTunnel)
+        : undefined;
+    const oldFfmpeg = this.ongoingSessions.get(sessionID);
+    if (oldFfmpeg) {
+      if (tunnel?.dataStream && oldFfmpeg.stdin) {
+        tunnel.dataStream.unpipe(oldFfmpeg.stdin);
+      }
+      if (!oldFfmpeg.killed) {
+        oldFfmpeg.kill('SIGKILL');
+      }
+    }
+    this.ongoingSessions.delete(sessionID);
+
+    // Clear the auto-kill timeout from the old session; startStream sets a new one.
+    const timeout = this.streamTimeouts.get(sessionID);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.streamTimeouts.delete(sessionID);
+    }
+
+    // Restore sessionInfo so startStream can re-use it, then re-enter.
+    // The proxySessions entry (tunnel) is preserved, so the new ffmpeg will
+    // pipe from the same live IMMI stripper.
+    const sessionInfo = this.sessionInfoCache.get(sessionID);
+    if (!sessionInfo) {
+      this.log.warn(
+        `${this.blinkCamera.name} - Audio-disable restart: session info missing, giving up`
+      );
+      this.controller?.forceStopStreamingSession(sessionID);
+      return;
+    }
+    this.pendingSessions.set(sessionID, sessionInfo);
+
+    await this.startStream(sessionID, video, audio);
+  }
+
   private async stopStream(sessionID: string): Promise<void> {
     this.streamRetries.delete(sessionID);
     this.sessionInfoCache.delete(sessionID);
     this.outputErrorSessions.delete(sessionID);
+    this.audioDisabledSessions.delete(sessionID);
     const startTime = this.streamStartTimes.get(sessionID);
     const elapsed = startTime
       ? ((Date.now() - startTime) / 1000).toFixed(1)
