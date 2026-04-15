@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.6.0...v1.6.1) (2026-04-15)
+
+### Bug Fixes
+
+* **platform:** preserve original error as cause in 2FA throw ([1e7f752](https://github.com/BitWise-0x/homebridge-blink-security/commit/1e7f7520c4e7f76f3ee5d43b4ac0559b65399c4e))
+
 ## [1.6.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0...v1.6.0) (2026-04-15)
 
 ### Features
