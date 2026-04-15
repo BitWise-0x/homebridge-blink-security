@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.6.1...v1.7.0) (2026-04-15)
+
+### Features
+
+* **streaming:** make Live View audio opt-in via enable-audio config ([c1cb6dd](https://github.com/BitWise-0x/homebridge-blink-security/commit/c1cb6ddfde0a4e8ef03e47ce94732d3f00e1e4b3))
+
 ## [1.6.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.6.0...v1.6.1) (2026-04-15)
 
 ### Bug Fixes
