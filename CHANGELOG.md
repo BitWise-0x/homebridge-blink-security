@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0...v1.6.0) (2026-04-15)
+
+### Features
+
+* **accessories:** set ConfiguredName on services for HomeKit pairing ([fa30321](https://github.com/BitWise-0x/homebridge-blink-security/commit/fa30321d4ced6ba38de5e626c8317b10cf47a8b8))
+
+### Bug Fixes
+
+* **logs:** clarify thumbnail refresh logging to reflect actual cadence ([a8a9dd7](https://github.com/BitWise-0x/homebridge-blink-security/commit/a8a9dd7ef27be57416de3b045cd71df0d6760874)), closes [#20](https://github.com/BitWise-0x/homebridge-blink-security/issues/20)
+
 ## [1.6.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.1-beta.1...v1.6.0-beta.1) (2026-04-15)
 
 ### Features
