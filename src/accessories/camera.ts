@@ -131,7 +131,8 @@ export class CameraAccessory {
       this.camera,
       this.log,
       this.hap,
-      this.config.liveView
+      this.config.liveView,
+      this.config.enableAudio
     );
 
     const controllerOptions: CameraControllerOptions = {

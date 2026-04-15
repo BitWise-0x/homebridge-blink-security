@@ -106,6 +106,12 @@
         "title": "Enable Diagnostic Logging on startup",
         "default": false,
         "type": "boolean"
+      },
+      "enable-audio": {
+        "title": "Enable Audio in Live View",
+        "default": false,
+        "description": "Enable one-way audio in HomeKit Live View. Requires Audio Streaming to also be enabled in the Blink app under Device Settings → Privacy.",
+        "type": "boolean"
       }
     },
     "required": ["username", "password"]
@@ -132,6 +138,7 @@
         "disable-thumbnail-refresh",
         "hide-temperature-sensor",
         "enable-liveview",
+        "enable-audio",
         "lv-save"
       ]
     },

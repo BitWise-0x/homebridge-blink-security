@@ -17,6 +17,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'camera-motion-polling-seconds'?: number;
   logging?: 'verbose' | 'debug';
   'enable-startup-diagnostic'?: boolean;
+  'enable-audio'?: boolean;
 }
 
 export interface BlinkOptions {
@@ -38,6 +39,7 @@ export interface BlinkOptions {
   verbose: boolean;
   debug: boolean;
   startupDiagnostic: boolean;
+  enableAudio: boolean;
 }
 
 export const DEFAULT_OPTIONS: BlinkOptions = {
@@ -58,6 +60,7 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   verbose: false,
   debug: false,
   startupDiagnostic: false,
+  enableAudio: false,
 };
 
 export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
@@ -105,6 +108,7 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   checkNumber('camera-status-polling-seconds', 'statusPollingSeconds');
   checkNumber('camera-motion-polling-seconds', 'motionPollingSeconds');
   checkBoolean('enable-startup-diagnostic', 'startupDiagnostic');
+  checkBoolean('enable-audio', 'enableAudio');
 
   if (opts.snapshotSeconds <= 0 || opts.noThumbnailRefresh) {
     opts.snapshotSeconds = Number.MAX_SAFE_INTEGER;

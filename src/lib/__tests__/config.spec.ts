@@ -254,5 +254,15 @@ describe('normalizeConfig', () => {
       );
       expect(opts.startupDiagnostic).toBe(true);
     });
+
+    it('maps enable-audio to enableAudio', () => {
+      const opts = normalizeConfig(makeConfig({ 'enable-audio': true }));
+      expect(opts.enableAudio).toBe(true);
+    });
+
+    it('defaults enableAudio to false', () => {
+      const opts = normalizeConfig(makeConfig({}));
+      expect(opts.enableAudio).toBe(false);
+    });
   });
 });

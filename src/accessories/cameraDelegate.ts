@@ -56,6 +56,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly log: Logger;
   private readonly hap: HAP;
   private readonly liveViewEnabled: boolean;
+  private readonly audioEnabled: boolean;
   controller?: CameraController;
   private pendingSessions = new Map<string, SessionInfo>();
   private proxySessions = new Map<string, ProxySession>();
@@ -75,12 +76,14 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     blinkCamera: BlinkCamera,
     log: Logger,
     hap: HAP,
-    liveViewEnabled = true
+    liveViewEnabled = true,
+    audioEnabled = false
   ) {
     this.blinkCamera = blinkCamera;
     this.log = log;
     this.hap = hap;
     this.liveViewEnabled = liveViewEnabled;
+    this.audioEnabled = audioEnabled;
   }
 
   async handleSnapshotRequest(
@@ -322,7 +325,10 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const ffmpegArgs: string[] = [];
 
     // IMMI streams have audio; RTSP XT streams are video-only; static fallback has none.
-    const hasAudio = !!rtspProxy?.proxyServer && !rtspProxy?.isRtsp;
+    // Audio output is opt-in via config because some camera privacy settings send
+    // malformed audio metadata (0 channels) that stalls the ffmpeg pipeline.
+    const hasAudio =
+      this.audioEnabled && !!rtspProxy?.proxyServer && !rtspProxy?.isRtsp;
 
     if (rtspProxy?.isImmi && rtspProxy.proxyServer) {
       // IMMI protocol — MPEG-TS input from local tunnel

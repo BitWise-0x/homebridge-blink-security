@@ -185,6 +185,7 @@ Blink requires two-factor authentication on first login:
 | `hide-enabled-switch`              | boolean | `false`    | Hide motion enabled/disabled switch                                                                                                  |
 | `hide-privacy-switch`              | boolean | `false`    | Hide privacy mode switch                                                                                                             |
 | `enable-liveview`                  | boolean | `true`     | Enable IMMI live view streaming                                                                                                      |
+| `enable-audio`                     | boolean | `false`    | Enable one-way audio in Live View. Also requires Audio Streaming in the Blink app under Device Settings → Privacy                    |
 | `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud                                                                                                  |
 | `disable-thumbnail-refresh`        | boolean | `false`    | Disable automatic thumbnail refresh                                                                                                  |
 | `camera-thumbnail-refresh-seconds` | integer | `3600`     | Minimum seconds between Blink cloud thumbnail refreshes per camera (HomeKit polls and is served cached thumbnails between refreshes) |
@@ -239,7 +240,19 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/e
 
 ### No Audio in Live View
 
-One-way audio is supported on IMMI cameras (Mini, Mini 2, Outdoor/Indoor, Doorbell, Wired Floodlight). XT / XT2 cameras use RTSP and are video-only. If audio is missing on a supported camera, enable `"logging": "debug"` in config to see FFmpeg's track detection output.
+One-way audio is supported on IMMI cameras (Mini, Mini 2, Outdoor/Indoor, Doorbell, Wired Floodlight). XT / XT2 cameras use RTSP and are video-only.
+
+Audio is opt-in. To enable it:
+
+1. Set `enable-audio: true` in plugin config
+2. Open the Blink app → Device Settings → Privacy → enable Audio Streaming for each camera
+3. Restart the child bridge
+
+If Audio Streaming is disabled in the Blink app, the camera sends malformed audio metadata that stalls the stream. That is why audio defaults to off.
+
+### Live View shows "Not responding"
+
+If Live View spins and eventually shows "Not responding" in the Home app, the most common cause is audio being enabled in plugin config while Audio Streaming is disabled in the Blink app for that camera. Either enable Audio Streaming in the Blink app, or set `enable-audio: false` in plugin config.
 
 ### VPN Interference
 
