@@ -190,14 +190,22 @@ export class CameraAccessory {
     }
   }
 
+  private applyConfiguredName(service: Service, name: string): void {
+    service.addOptionalCharacteristic(this.Characteristic.ConfiguredName);
+    service.setCharacteristic(this.Characteristic.ConfiguredName, name);
+  }
+
   private setupMotionSensor(): void {
+    const name = `${this.camera.name} Motion`;
     const motionService =
       this.accessory.getService(this.Service.MotionSensor) ||
       this.accessory.addService(
         this.Service.MotionSensor,
-        `${this.camera.name} Motion`,
+        name,
         `motion.${this.camera.serial}`
       );
+
+    this.applyConfiguredName(motionService, name);
 
     motionService
       .getCharacteristic(this.Characteristic.MotionDetected)
@@ -205,13 +213,16 @@ export class CameraAccessory {
   }
 
   private setupBattery(): void {
+    const name = `${this.camera.name} Battery`;
     const batteryService =
       this.accessory.getService(this.Service.Battery) ||
       this.accessory.addService(
         this.Service.Battery,
-        'Battery',
+        name,
         `battery-sensor.${this.camera.serial}`
       );
+
+    this.applyConfiguredName(batteryService, name);
 
     batteryService
       .getCharacteristic(this.Characteristic.StatusLowBattery)
@@ -227,13 +238,16 @@ export class CameraAccessory {
   }
 
   private setupTemperatureSensor(): void {
+    const name = `${this.camera.name} Temperature`;
     const tempService =
       this.accessory.getService(this.Service.TemperatureSensor) ||
       this.accessory.addService(
         this.Service.TemperatureSensor,
-        `${this.camera.name} Temperature`,
+        name,
         `temp-sensor.${this.camera.serial}`
       );
+
+    this.applyConfiguredName(tempService, name);
 
     tempService
       .getCharacteristic(this.Characteristic.CurrentTemperature)
@@ -244,13 +258,16 @@ export class CameraAccessory {
   }
 
   private setupEnabledSwitch(): void {
+    const name = `${this.camera.name} Motion Enabled`;
     const service =
       this.accessory.getService(`enabled.${this.camera.serial}`) ||
       this.accessory.addService(
         this.Service.Switch,
-        `${this.camera.name} Motion Enabled`,
+        name,
         `enabled.${this.camera.serial}`
       );
+
+    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -261,13 +278,16 @@ export class CameraAccessory {
   }
 
   private setupPrivacySwitch(): void {
+    const name = `${this.camera.name} Privacy Mode`;
     const service =
       this.accessory.getService(`privacy.${this.camera.serial}`) ||
       this.accessory.addService(
         this.Service.Switch,
-        `${this.camera.name} Privacy Mode`,
+        name,
         `privacy.${this.camera.serial}`
       );
+
+    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -278,13 +298,16 @@ export class CameraAccessory {
   }
 
   private setupNightVisionSwitch(): void {
+    const name = `${this.camera.name} Night Vision`;
     const service =
       this.accessory.getService(`nightvision.${this.camera.serial}`) ||
       this.accessory.addService(
         this.Service.Switch,
-        `${this.camera.name} Night Vision`,
+        name,
         `nightvision.${this.camera.serial}`
       );
+
+    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -295,13 +318,16 @@ export class CameraAccessory {
   }
 
   private setupRecordClipSwitch(): void {
+    const name = `${this.camera.name} Record Clip`;
     const service =
       this.accessory.getService(`record.${this.camera.serial}`) ||
       this.accessory.addService(
         this.Service.Switch,
-        `${this.camera.name} Record Clip`,
+        name,
         `record.${this.camera.serial}`
       );
+
+    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)
