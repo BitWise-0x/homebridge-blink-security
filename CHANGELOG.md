@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.7.0...v1.7.1) (2026-04-15)
+
+### Bug Fixes
+
+* **streaming:** auto-recover Live View when camera audio is 0 channels ([1a163cd](https://github.com/BitWise-0x/homebridge-blink-security/commit/1a163cd7b72b0c75c3fe9f978afad15c1a898457))
+
 ## [1.7.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.6.1...v1.7.0) (2026-04-15)
 
 ### Features
