@@ -85,13 +85,17 @@ export class SirenAccessory {
   }
 
   private setupSirenSwitch(): void {
+    const name = `${this.siren.name} Siren`;
     const service =
       this.accessory.getService(this.Service.Switch) ||
       this.accessory.addService(
         this.Service.Switch,
-        `${this.siren.name} Siren`,
+        name,
         `siren.${this.siren.serial}`
       );
+
+    service.addOptionalCharacteristic(this.Characteristic.ConfiguredName);
+    service.setCharacteristic(this.Characteristic.ConfiguredName, name);
 
     // Blink API has no endpoint to query active siren state
     service

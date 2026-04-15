@@ -78,7 +78,7 @@
         "type": "integer",
         "minimum": 0,
         "placeholder": "3600",
-        "description": "Force Thumbnail refresh every N seconds. If auto refresh is disabled, this value is ignored."
+        "description": "Minimum interval (seconds) between Blink cloud thumbnail refreshes per camera. Controls how often the plugin asks a camera to capture a new thumbnail — not how often HomeKit displays them. HomeKit's own snapshot polling (~10s while the Home app is foregrounded, ~60s backgrounded) is served from cache between refreshes. Default 3600. Ignored if auto refresh is disabled."
       },
       "camera-status-polling-seconds": {
         "title": "Status Polling (seconds)",

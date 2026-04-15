@@ -100,8 +100,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
           `${this.blinkCamera.name} - Snapshot: 0 bytes (${request.width}x${request.height}) — ${url ? `URL: ${url}` : 'no thumbnail URL'}`
         );
       } else {
-        this.log.info(
-          `${this.blinkCamera.name} - Snapshot: ${size} bytes (${request.width}x${request.height})`
+        this.log.debug(
+          `${this.blinkCamera.name} - Snapshot served (cached): ${size} bytes (${request.width}x${request.height})`
         );
       }
       callback(undefined, bytes ?? Buffer.alloc(0));
@@ -329,7 +329,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       ffmpegArgs.push(
         '-hide_banner',
         '-loglevel',
-        'info',
+        'warning',
         '-analyzeduration',
         '2000000',
         '-probesize',
@@ -549,7 +549,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     let zeroChannelAudioWarned = false;
     ffmpegVideo.stderr?.on('data', (data: Buffer) => {
       const msg = String(data).trim();
-      this.log.info(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
+      this.log.debug(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
       if (msg.includes('bind failed') || msg.includes('Error opening output')) {
         this.outputErrorSessions.add(sessionID);
       }
