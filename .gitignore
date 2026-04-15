@@ -128,3 +128,6 @@ dist
 
 # Potentially sensitive Homebridge files
 test/hbConfig
+
+# Claude Code local
+.claude
