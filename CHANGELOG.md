@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.1-beta.1...v1.6.0-beta.1) (2026-04-15)
+
+### Features
+
+* **accessories:** set ConfiguredName on services for HomeKit pairing ([fa30321](https://github.com/BitWise-0x/homebridge-blink-security/commit/fa30321d4ced6ba38de5e626c8317b10cf47a8b8))
+
 ## [1.5.1-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.5.0...v1.5.1-beta.1) (2026-04-14)
 
 ### Bug Fixes
