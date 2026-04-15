@@ -273,7 +273,8 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       } catch (e) {
         this.log.error(String(e));
         throw new Error(
-          'Blink 2FA verification failed. Check your PIN and restart.'
+          'Blink 2FA verification failed. Check your PIN and restart.',
+          { cause: e }
         );
       }
     } else {
