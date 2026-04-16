@@ -12,6 +12,7 @@ import {
 
 import type { BlinkDoorbell } from '../devices/doorbell.js';
 import type { BlinkOptions } from '../lib/config.js';
+import { routineInfo } from '../lib/logInfo.js';
 import { BlinkCameraDelegate } from './cameraDelegate.js';
 
 export class DoorbellAccessory {
@@ -123,7 +124,8 @@ export class DoorbellAccessory {
       this.log,
       this.hap,
       this.config.liveView,
-      this.config.enableAudio
+      this.config.enableAudio,
+      this.config.hideRoutineLogs
     );
 
     const controllerOptions: CameraControllerOptions = {
@@ -195,7 +197,11 @@ export class DoorbellAccessory {
       .onGet(() => null);
 
     this.doorbell.onPress = () => {
-      this.log.info(`${this.doorbell.name}: Doorbell pressed`);
+      routineInfo(
+        this.log,
+        this.config,
+        `${this.doorbell.name}: Doorbell pressed`
+      );
       this.doorbellService?.updateCharacteristic(
         this.Characteristic.ProgrammableSwitchEvent,
         this.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS
@@ -278,7 +284,11 @@ export class DoorbellAccessory {
       .onSet(async value => {
         if (value) {
           try {
-            this.log.info(`${this.doorbell.name}: Recording clip`);
+            routineInfo(
+              this.log,
+              this.config,
+              `${this.doorbell.name}: Recording clip`
+            );
             await this.doorbell.recordClip();
           } finally {
             setTimeout(() => {

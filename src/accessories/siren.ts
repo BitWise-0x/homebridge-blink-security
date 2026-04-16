@@ -7,11 +7,14 @@ import {
 } from 'homebridge';
 
 import type { BlinkSiren } from '../devices/siren.js';
+import type { BlinkOptions } from '../lib/config.js';
+import { routineInfo } from '../lib/logInfo.js';
 
 export class SirenAccessory {
   private readonly accessory: PlatformAccessory;
   private readonly siren: BlinkSiren;
   private readonly log: Logger;
+  private readonly config: BlinkOptions;
   private readonly Characteristic: typeof Characteristic;
   private readonly Service: typeof Service;
 
@@ -19,10 +22,12 @@ export class SirenAccessory {
     siren: BlinkSiren,
     api: API,
     log: Logger,
+    config: BlinkOptions,
     cachedAccessories: PlatformAccessory[]
   ) {
     this.siren = siren;
     this.log = log;
+    this.config = config;
     this.Characteristic = api.hap.Characteristic;
     this.Service = api.hap.Service;
 
@@ -103,10 +108,18 @@ export class SirenAccessory {
       .onGet(() => false)
       .onSet(async value => {
         if (value) {
-          this.log.info(`${this.siren.name}: Activating siren`);
+          routineInfo(
+            this.log,
+            this.config,
+            `${this.siren.name}: Activating siren`
+          );
           await this.siren.activate();
         } else {
-          this.log.info(`${this.siren.name}: Deactivating siren`);
+          routineInfo(
+            this.log,
+            this.config,
+            `${this.siren.name}: Deactivating siren`
+          );
           await this.siren.deactivate();
         }
       });

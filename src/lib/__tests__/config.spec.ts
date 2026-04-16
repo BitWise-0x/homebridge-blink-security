@@ -35,6 +35,7 @@ describe('normalizeConfig', () => {
       expect(opts.verbose).toBe(false);
       expect(opts.debug).toBe(false);
       expect(opts.startupDiagnostic).toBe(false);
+      expect(opts.hideRoutineLogs).toBe(false);
     });
   });
 
@@ -171,29 +172,40 @@ describe('normalizeConfig', () => {
     });
   });
 
-  describe('verbose and debug from logging', () => {
+  describe('verbose, debug, and hideRoutineLogs from logging', () => {
+    it('sets hideRoutineLogs=true for logging "quiet"', () => {
+      const opts = normalizeConfig(makeConfig({ logging: 'quiet' }));
+      expect(opts.hideRoutineLogs).toBe(true);
+      expect(opts.verbose).toBe(false);
+      expect(opts.debug).toBe(false);
+    });
+
     it('sets verbose=true, debug=false for logging "verbose"', () => {
       const opts = normalizeConfig(makeConfig({ logging: 'verbose' }));
+      expect(opts.hideRoutineLogs).toBe(false);
       expect(opts.verbose).toBe(true);
       expect(opts.debug).toBe(false);
     });
 
     it('sets both verbose=true and debug=true for logging "debug"', () => {
       const opts = normalizeConfig(makeConfig({ logging: 'debug' }));
+      expect(opts.hideRoutineLogs).toBe(false);
       expect(opts.verbose).toBe(true);
       expect(opts.debug).toBe(true);
     });
 
-    it('sets both false when logging is undefined', () => {
+    it('sets all false when logging is undefined', () => {
       const opts = normalizeConfig(makeConfig());
+      expect(opts.hideRoutineLogs).toBe(false);
       expect(opts.verbose).toBe(false);
       expect(opts.debug).toBe(false);
     });
 
-    it('sets both false for unknown logging value', () => {
+    it('sets all false for unknown logging value', () => {
       const opts = normalizeConfig(
         makeConfig({ logging: 'info' as 'verbose' })
       );
+      expect(opts.hideRoutineLogs).toBe(false);
       expect(opts.verbose).toBe(false);
       expect(opts.debug).toBe(false);
     });

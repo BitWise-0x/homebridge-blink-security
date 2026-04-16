@@ -13,6 +13,7 @@ import {
   type BlinkOptions,
 } from './lib/config.js';
 import { BlinkAuthClient, BlinkAuth2FARequiredError } from './lib/auth.js';
+import { routineInfo } from './lib/logInfo.js';
 import { ExponentialBackoff } from './lib/utils.js';
 import { Blink } from './devices/index.js';
 import { SecuritySystemAccessory } from './accessories/securitySystem.js';
@@ -79,13 +80,17 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       for (const network of this.blink.networks.values()) {
         const current = network.data.lv_save;
         const desired = this.config.lvSave;
-        this.log.info(
+        routineInfo(
+          this.log,
+          this.config,
           `Blink ${network.name} - lv_save: ${current ?? 'unknown'} (config: ${desired})`
         );
         if (current !== undefined && current !== desired) {
           try {
             await this.blink.api.updateNetworkLvSave(network.data.id, desired);
-            this.log.info(
+            routineInfo(
+              this.log,
+              this.config,
               `Blink ${network.name} - lv_save updated to ${desired}`
             );
           } catch (e) {
@@ -147,6 +152,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
           siren,
           this.api,
           this.log,
+          this.config,
           this.cachedAccessories
         );
         accessories.push(sirenAccessory.platformAccessory);
@@ -287,7 +293,8 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       this.log,
       this.config.statusPollingSeconds,
       this.config.motionPollingSeconds,
-      this.config.snapshotSeconds
+      this.config.snapshotSeconds,
+      this.config
     );
 
     await blink.refreshData();

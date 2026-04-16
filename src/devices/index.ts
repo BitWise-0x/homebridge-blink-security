@@ -9,6 +9,8 @@ import {
   type MediaEntry,
 } from '../lib/api.js';
 import type { BlinkAuthClient } from '../lib/auth.js';
+import { DEFAULT_OPTIONS, type BlinkOptions } from '../lib/config.js';
+import { routineInfo } from '../lib/logInfo.js';
 import { BlinkNetwork, type NetworkData } from './network.js';
 import { BlinkCamera } from './camera.js';
 import { BlinkDoorbell } from './doorbell.js';
@@ -31,6 +33,7 @@ export const DOORBELL_DEVICE_TYPE = 'lotus';
 export class Blink {
   readonly api: BlinkApi;
   readonly log: Logger;
+  readonly options: BlinkOptions;
   networks = new Map<number, BlinkNetwork>();
   cameras = new Map<number, BlinkCamera>();
   doorbells = new Map<number, BlinkDoorbell>();
@@ -45,9 +48,11 @@ export class Blink {
     log: Logger,
     statusPoll = STATUS_POLL,
     motionPoll = MOTION_POLL,
-    snapshotRate = THUMBNAIL_TTL
+    snapshotRate = THUMBNAIL_TTL,
+    options: BlinkOptions = DEFAULT_OPTIONS
   ) {
-    this.api = new BlinkApi(authClient, log);
+    this.options = options;
+    this.api = new BlinkApi(authClient, log, options);
     this.log = log;
     this.statusPoll = statusPoll ?? STATUS_POLL;
     this.motionPoll = motionPoll ?? MOTION_POLL;
@@ -146,7 +151,9 @@ export class Blink {
         }
 
         if (fallbackDoorbells.length > 0) {
-          this.log.info(
+          routineInfo(
+            this.log,
+            this.options,
             `Blink fallback discovered ${fallbackDoorbells.length} doorbell(s) from recent media.`
           );
           allDoorbells = fallbackDoorbells;
@@ -189,7 +196,9 @@ export class Blink {
           }
         }
         if (allDoorbells.length > 0) {
-          this.log.info(
+          routineInfo(
+            this.log,
+            this.options,
             `Blink fallback restored ${allDoorbells.length} doorbell(s) from cached state.`
           );
         }
@@ -428,7 +437,9 @@ export class Blink {
 
         if (eligible && Date.now() >= lastSnapshot) {
           if (camera.lowBattery || !camera.online) {
-            this.log.info(
+            routineInfo(
+              this.log,
+              this.options,
               `${camera.name} - ${!camera.online ? 'Offline' : 'Low Battery'}; Skipping snapshot`
             );
             return false;
@@ -436,7 +447,9 @@ export class Blink {
 
           camera.thumbnailCreatedAt = Date.now();
 
-          this.log.info(
+          routineInfo(
+            this.log,
+            this.options,
             `${camera.name} - Cloud thumbnail refresh (interval: ${this.snapshotRate}s)`
           );
 
@@ -532,7 +545,9 @@ export class Blink {
       Date.now() - start < timeout * 1000
     ) {
       const delayMs = backoff.delayMs;
-      this.log.info(
+      routineInfo(
+        this.log,
+        this.options,
         `Sleeping ${Math.round(delayMs / 1000)}s: ${response.message}`
       );
       await backoff.wait();
@@ -559,7 +574,9 @@ export class Blink {
       Date.now() - start < timeout * 1000
     ) {
       const delayMs = backoff.delayMs;
-      this.log.info(
+      routineInfo(
+        this.log,
+        this.options,
         `Sleeping ${Math.round(delayMs / 1000)}s: ${response.message}`
       );
       await backoff.wait();
@@ -585,13 +602,19 @@ export class Blink {
 
     if (eligible && Date.now() >= lastSnapshot) {
       if (!doorbell.online) {
-        this.log.info(`${doorbell.name} - Offline; Skipping snapshot`);
+        routineInfo(
+          this.log,
+          this.options,
+          `${doorbell.name} - Offline; Skipping snapshot`
+        );
         return;
       }
 
       doorbell.thumbnailCreatedAt = Date.now();
 
-      this.log.info(
+      routineInfo(
+        this.log,
+        this.options,
         `${doorbell.name} - Cloud thumbnail refresh (interval: ${this.snapshotRate}s)`
       );
 

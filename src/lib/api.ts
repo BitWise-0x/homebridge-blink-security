@@ -2,15 +2,23 @@ import { Logger } from 'homebridge';
 
 import { BlinkClient } from './client.js';
 import type { BlinkAuthClient } from './auth.js';
+import { DEFAULT_OPTIONS, type BlinkOptions } from './config.js';
+import { routineInfo } from './logInfo.js';
 import { ExponentialBackoff, sleep } from './utils.js';
 
 export class BlinkApi {
   readonly client: BlinkClient;
   private readonly log: Logger;
+  readonly options: BlinkOptions;
   private readonly _lockCache = new Map<string, Promise<unknown>>();
 
-  constructor(authClient: BlinkAuthClient, log: Logger) {
+  constructor(
+    authClient: BlinkAuthClient,
+    log: Logger,
+    options: BlinkOptions = DEFAULT_OPTIONS
+  ) {
     this.log = log;
+    this.options = options;
     this.client = new BlinkClient(authClient, log);
   }
 
@@ -445,7 +453,11 @@ export class BlinkApi {
     }
     while (cmd.message && /busy/i.test(cmd.message)) {
       const delayMs = backoff.delayMs;
-      this.log.info(`Sleeping ${Math.round(delayMs / 1000)}s: ${cmd.message}`);
+      routineInfo(
+        this.log,
+        this.options,
+        `Sleeping ${Math.round(delayMs / 1000)}s: ${cmd.message}`
+      );
       await backoff.wait();
       if (Date.now() - start > timeout * 1000) {
         return undefined;

@@ -12,6 +12,7 @@ import {
 
 import type { BlinkCamera } from '../devices/camera.js';
 import type { BlinkOptions } from '../lib/config.js';
+import { routineInfo } from '../lib/logInfo.js';
 import { BlinkCameraDelegate } from './cameraDelegate.js';
 
 export class CameraAccessory {
@@ -132,7 +133,8 @@ export class CameraAccessory {
       this.log,
       this.hap,
       this.config.liveView,
-      this.config.enableAudio
+      this.config.enableAudio,
+      this.config.hideRoutineLogs
     );
 
     const controllerOptions: CameraControllerOptions = {
@@ -336,7 +338,11 @@ export class CameraAccessory {
       .onSet(async value => {
         if (value) {
           try {
-            this.log.info(`${this.camera.name}: Recording clip`);
+            routineInfo(
+              this.log,
+              this.config,
+              `${this.camera.name}: Recording clip`
+            );
             await this.camera.recordClip();
           } finally {
             setTimeout(() => {

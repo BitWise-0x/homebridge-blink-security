@@ -57,6 +57,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly hap: HAP;
   private readonly liveViewEnabled: boolean;
   private readonly audioEnabled: boolean;
+  private readonly hideRoutineLogs: boolean;
   controller?: CameraController;
   private pendingSessions = new Map<string, SessionInfo>();
   private proxySessions = new Map<string, ProxySession>();
@@ -78,13 +79,15 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     log: Logger,
     hap: HAP,
     liveViewEnabled = true,
-    audioEnabled = false
+    audioEnabled = false,
+    hideRoutineLogs = false
   ) {
     this.blinkCamera = blinkCamera;
     this.log = log;
     this.hap = hap;
     this.liveViewEnabled = liveViewEnabled;
     this.audioEnabled = audioEnabled;
+    this.hideRoutineLogs = hideRoutineLogs;
   }
 
   async handleSnapshotRequest(
@@ -279,10 +282,12 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       await this.startStream(request.sessionID, request.video, request.audio);
     } else if (request.type === StreamRequestTypes.RECONFIGURE) {
       const v = request.video;
-      this.log.info(
-        `${this.blinkCamera.name} - LiveView RECONFIGURE` +
-          ` (${v.width}x${v.height}, ${v.fps} fps, ${v.max_bit_rate} kbps)`
-      );
+      if (!this.hideRoutineLogs) {
+        this.log.info(
+          `${this.blinkCamera.name} - LiveView RECONFIGURE` +
+            ` (${v.width}x${v.height}, ${v.fps} fps, ${v.max_bit_rate} kbps)`
+        );
+      }
       // Acknowledge reconfigure — we can't change the Blink stream parameters
       // mid-stream, but acknowledging prevents HomeKit from killing the stream.
     } else if (request.type === StreamRequestTypes.STOP) {

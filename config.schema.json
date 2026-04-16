@@ -98,6 +98,7 @@
         "title": "Advanced Logging",
         "type": "string",
         "oneOf": [
+          { "title": "Quiet (suppress routine chatter)", "enum": ["quiet"] },
           { "title": "Verbose", "enum": ["verbose"] },
           { "title": "Debug", "enum": ["debug"] }
         ]
