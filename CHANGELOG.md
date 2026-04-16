@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.7.1...v1.8.0-beta.1) (2026-04-16)
+
+### Features
+
+* **logging:** add quiet mode to suppress routine log chatter ([303ca7c](https://github.com/BitWise-0x/homebridge-blink-security/commit/303ca7c544e59d5c57f2527531df84b757dff03b)), closes [#24](https://github.com/BitWise-0x/homebridge-blink-security/issues/24)
+
 ## [1.7.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.7.0...v1.7.1) (2026-04-15)
 
 ### Bug Fixes
