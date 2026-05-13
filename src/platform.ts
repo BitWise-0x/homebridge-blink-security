@@ -21,8 +21,6 @@ import { CameraAccessory } from './accessories/camera.js';
 import { DoorbellAccessory } from './accessories/doorbell.js';
 import { SirenAccessory } from './accessories/siren.js';
 
-const BLINK_STATUS_EVENT_LOOP = 10;
-
 export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private readonly log: Logger;
   private readonly config: BlinkOptions;
@@ -32,11 +30,8 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private blink?: Blink;
   private authClient?: BlinkAuthClient;
   private pollTimer?: ReturnType<typeof setTimeout>;
-  private readonly pollBackoff = new ExponentialBackoff(
-    BLINK_STATUS_EVENT_LOOP * 1000,
-    120000,
-    2
-  );
+  private readonly pollBackoff: ExponentialBackoff;
+
   private securityAccessories: SecuritySystemAccessory[] = [];
   private cameraAccessories: CameraAccessory[] = [];
   private doorbellAccessories: DoorbellAccessory[] = [];
@@ -47,6 +42,13 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     this.config = normalizeConfig(this.rawConfig);
     this.config.storagePath = api.user.storagePath();
     this.api = api;
+
+    const blinkStatusPollingMs = this.config.blinkStatusPollingSeconds * 1000;
+    this.pollBackoff = new ExponentialBackoff(
+      blinkStatusPollingMs,
+      blinkStatusPollingMs * 12,
+      2
+    );
 
     if (!this.rawConfig.username || !this.rawConfig.password) {
       this.log.error(
@@ -291,7 +293,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     const blink = new Blink(
       authClient,
       this.log,
-      this.config.statusPollingSeconds,
+      this.config.cameraStatusPollingSeconds,
       this.config.motionPollingSeconds,
       this.config.snapshotSeconds,
       this.config
