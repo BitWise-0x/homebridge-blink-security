@@ -26,6 +26,8 @@ describe('normalizeConfig', () => {
       expect(opts.noTemperatureSensor).toBe(false);
       expect(opts.noEnabledSwitch).toBe(false);
       expect(opts.noPrivacySwitch).toBe(false);
+      expect(opts.noCameras).toBe(false);
+      expect(opts.noDoorbells).toBe(false);
       expect(opts.liveView).toBe(true);
       expect(opts.lvSave).toBe(false);
       expect(opts.noThumbnailRefresh).toBe(false);

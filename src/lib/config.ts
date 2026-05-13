@@ -28,12 +28,12 @@ export interface BlinkOptions {
   pin?: string;
   storagePath: string;
   noAlarm: boolean;
-  noCameras: boolean;
-  noDoorbells: boolean;
   noManualArmSwitch: boolean;
   noTemperatureSensor: boolean;
   noEnabledSwitch: boolean;
   noPrivacySwitch: boolean;
+  noCameras: boolean;
+  noDoorbells: boolean;
   liveView: boolean;
   lvSave: boolean;
   noThumbnailRefresh: boolean;
@@ -52,12 +52,12 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   password: '',
   storagePath: '',
   noAlarm: false,
-  noCameras: false,
-  noDoorbells: false,
   noManualArmSwitch: false,
   noTemperatureSensor: false,
   noEnabledSwitch: false,
   noPrivacySwitch: false,
+  noCameras: false,
+  noDoorbells: false,
   liveView: true,
   lvSave: false,
   noThumbnailRefresh: false,
@@ -105,8 +105,6 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   };
 
   checkBoolean('hide-alarm', 'noAlarm');
-  checkBoolean('hide-cameras', 'noCameras');
-  checkBoolean('hide-doorbells', 'noDoorbells');
   checkBoolean('hide-manual-arm-switch', 'noManualArmSwitch');
   checkBoolean('hide-temperature-sensor', 'noTemperatureSensor');
   checkBoolean('hide-enabled-switch', 'noEnabledSwitch');
