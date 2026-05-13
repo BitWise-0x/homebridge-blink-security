@@ -14,7 +14,6 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'enable-liveview'?: boolean;
   'lv-save'?: boolean;
   'disable-thumbnail-refresh'?: boolean;
-  'blink-status-polling-seconds'?: number;
   'camera-thumbnail-refresh-seconds'?: number;
   'camera-status-polling-seconds'?: number;
   'camera-motion-polling-seconds'?: number;
@@ -38,9 +37,8 @@ export interface BlinkOptions {
   liveView: boolean;
   lvSave: boolean;
   noThumbnailRefresh: boolean;
-  blinkStatusPollingSeconds: number;
   snapshotSeconds: number;
-  cameraStatusPollingSeconds: number;
+  statusPollingSeconds: number;
   motionPollingSeconds: number;
   verbose: boolean;
   debug: boolean;
@@ -63,9 +61,8 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   liveView: true,
   lvSave: false,
   noThumbnailRefresh: false,
-  blinkStatusPollingSeconds: 10,
   snapshotSeconds: 3600,
-  cameraStatusPollingSeconds: 30,
+  statusPollingSeconds: 30,
   motionPollingSeconds: 15,
   verbose: false,
   debug: false,
@@ -117,9 +114,8 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   checkBoolean('enable-liveview', 'liveView');
   checkBoolean('lv-save', 'lvSave');
   checkBoolean('disable-thumbnail-refresh', 'noThumbnailRefresh');
-  checkNumber('blink-status-polling-seconds', 'blinkStatusPollingSeconds');
   checkNumber('camera-thumbnail-refresh-seconds', 'snapshotSeconds');
-  checkNumber('camera-status-polling-seconds', 'cameraStatusPollingSeconds');
+  checkNumber('camera-status-polling-seconds', 'statusPollingSeconds');
   checkNumber('camera-motion-polling-seconds', 'motionPollingSeconds');
   checkBoolean('enable-startup-diagnostic', 'startupDiagnostic');
   checkBoolean('enable-audio', 'enableAudio');
