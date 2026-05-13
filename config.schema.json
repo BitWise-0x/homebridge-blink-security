@@ -83,6 +83,13 @@
         "description": "By default, the thumbnails of the cameras will refresh when the camera is enabled, disabling the auto refresh keeps the default thumbnail untouched.",
         "type": "boolean"
       },
+      "blink-status-polling-seconds": {
+        "title": "Blink Status Polling (seconds)",
+        "type": "integer",
+        "minimum": 1,
+        "placeholder": "10",
+        "description": "Interval (seconds) between Blink system refreshes. Default is 10 seconds and this is the minimum recommended value."
+      },
       "camera-thumbnail-refresh-seconds": {
         "title": "Camera Thumbnail Refresh (seconds)",
         "type": "integer",
@@ -91,7 +98,7 @@
         "description": "Minimum interval (seconds) between Blink cloud thumbnail refreshes per camera. Controls how often the plugin asks a camera to capture a new thumbnail — not how often HomeKit displays them. HomeKit's own snapshot polling (~10s while the Home app is foregrounded, ~60s backgrounded) is served from cache between refreshes. Default 3600. Ignored if auto refresh is disabled."
       },
       "camera-status-polling-seconds": {
-        "title": "Status Polling (seconds)",
+        "title": "Camera Status Polling (seconds)",
         "type": "integer",
         "minimum": 1,
         "placeholder": "30",
@@ -161,6 +168,7 @@
       "expandable": true,
       "expanded": false,
       "items": [
+        "blink-status-polling-seconds",
         "camera-thumbnail-refresh-seconds",
         "camera-status-polling-seconds",
         "camera-motion-polling-seconds",

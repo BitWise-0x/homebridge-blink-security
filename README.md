@@ -190,8 +190,9 @@ Blink requires two-factor authentication on first login:
 | `enable-audio`                     | boolean | `false`    | Enable one-way audio in Live View. Also requires Audio Streaming in the Blink app under Device Settings → Privacy                           |
 | `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud                                                                                                         |
 | `disable-thumbnail-refresh`        | boolean | `false`    | Disable automatic thumbnail refresh                                                                                                         |
+| `blink-status-polling-seconds`     | integer | `10`       | Minimum seconds between Blink system refreshes                                                                                              |
 | `camera-thumbnail-refresh-seconds` | integer | `3600`     | Minimum seconds between Blink cloud thumbnail refreshes per camera (HomeKit polls and is served cached thumbnails between refreshes)        |
-| `camera-status-polling-seconds`    | integer | `30`       | Status polling interval in seconds                                                                                                          |
+| `camera-status-polling-seconds`    | integer | `30`       | Camera status polling interval in seconds                                                                                                   |
 | `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds                                                                                                |
 | `logging`                          | string  |            | `"quiet"` suppresses routine chatter (thumbnail refresh, reconfigure, clip recording, sleep). `"verbose"` or `"debug"` for extended logging |
 | `enable-startup-diagnostic`        | boolean | `false`    | Log diagnostic info on startup                                                                                                              |
