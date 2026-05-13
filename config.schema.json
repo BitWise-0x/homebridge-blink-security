@@ -55,6 +55,16 @@
         "description": "Privacy-Mode prevents thumbnails from refreshing when the Security System is not armed. Disabling this switch will globally disable privacy-mode on all cameras.",
         "type": "boolean"
       },
+      "hide-cameras": {
+        "title": "Hide Camera Accessories",
+        "placeholder": false,
+        "type": "boolean"
+      },
+      "hide-doorbells": {
+        "title": "Hide Doorbell Accessories",
+        "placeholder": false,
+        "type": "boolean"
+      },
       "enable-liveview": {
         "title": "Enable LiveView when clicking on a camera feed",
         "default": true,
@@ -136,6 +146,8 @@
         "hide-manual-arm-switch",
         "hide-enabled-switch",
         "hide-privacy-switch",
+        "hide-cameras",
+        "hide-doorbells",
         "disable-thumbnail-refresh",
         "hide-temperature-sensor",
         "enable-liveview",

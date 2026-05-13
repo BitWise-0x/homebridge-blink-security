@@ -236,6 +236,16 @@ describe('normalizeConfig', () => {
       expect(opts.noPrivacySwitch).toBe(true);
     });
 
+    it('maps hide-cameras to noCameras', () => {
+      const opts = normalizeConfig(makeConfig({ 'hide-cameras': true }));
+      expect(opts.noCameras).toBe(true);
+    });
+
+    it('maps hide-doorbells to noDoorbells', () => {
+      const opts = normalizeConfig(makeConfig({ 'hide-doorbells': true }));
+      expect(opts.noDoorbells).toBe(true);
+    });
+
     it('maps enable-liveview to liveView', () => {
       const opts = normalizeConfig(makeConfig({ 'enable-liveview': false }));
       expect(opts.liveView).toBe(false);

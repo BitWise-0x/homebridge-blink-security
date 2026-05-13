@@ -184,6 +184,8 @@ Blink requires two-factor authentication on first login:
 | `hide-temperature-sensor`          | boolean | `false`    | Hide temperature sensors on cameras                                                                                                         |
 | `hide-enabled-switch`              | boolean | `false`    | Hide motion enabled/disabled switch                                                                                                         |
 | `hide-privacy-switch`              | boolean | `false`    | Hide privacy mode switch                                                                                                                    |
+| `hide-cameras`                     | boolean | `false`    | Hide all cameras                                                                                                                            |
+| `hide-doorbells`                   | boolean | `false`    | Hide all doorbells                                                                                                                          |
 | `enable-liveview`                  | boolean | `true`     | Enable IMMI live view streaming                                                                                                             |
 | `enable-audio`                     | boolean | `false`    | Enable one-way audio in Live View. Also requires Audio Streaming in the Blink app under Device Settings → Privacy                           |
 | `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud                                                                                                         |

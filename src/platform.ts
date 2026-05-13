@@ -124,6 +124,10 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       }
 
       for (const camera of this.blink.cameras.values()) {
+        if (this.config.noCameras) {
+          continue;
+        }
+
         const cameraAccessory = new CameraAccessory(
           camera,
           this.api,
@@ -136,6 +140,10 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       }
 
       for (const doorbell of this.blink.doorbells.values()) {
+        if (this.config.noDoorbells) {
+          continue;
+        }
+
         const doorbellAccessory = new DoorbellAccessory(
           doorbell,
           this.api,
