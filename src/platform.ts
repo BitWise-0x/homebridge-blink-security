@@ -46,7 +46,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     const blinkStatusPollingMs = this.config.blinkStatusPollingSeconds * 1000;
     this.pollBackoff = new ExponentialBackoff(
       blinkStatusPollingMs,
-      blinkStatusPollingMs * 12,
+      Math.min(blinkStatusPollingMs * 12, 300_000),
       2
     );
 
@@ -293,7 +293,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     const blink = new Blink(
       authClient,
       this.log,
-      this.config.cameraStatusPollingSeconds,
+      this.config.statusPollingSeconds,
       this.config.motionPollingSeconds,
       this.config.snapshotSeconds,
       this.config

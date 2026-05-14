@@ -31,7 +31,7 @@ describe('normalizeConfig', () => {
       expect(opts.noThumbnailRefresh).toBe(false);
       expect(opts.blinkStatusPollingSeconds).toBe(10);
       expect(opts.snapshotSeconds).toBe(3600);
-      expect(opts.cameraStatusPollingSeconds).toBe(30);
+      expect(opts.statusPollingSeconds).toBe(30);
       expect(opts.motionPollingSeconds).toBe(15);
       expect(opts.verbose).toBe(false);
       expect(opts.debug).toBe(false);
@@ -254,11 +254,11 @@ describe('normalizeConfig', () => {
       expect(opts.blinkStatusPollingSeconds).toBe(60);
     });
 
-    it('maps camera-status-polling-seconds to cameraStatusPollingSeconds', () => {
+    it('maps camera-status-polling-seconds to statusPollingSeconds', () => {
       const opts = normalizeConfig(
         makeConfig({ 'camera-status-polling-seconds': 60 })
       );
-      expect(opts.cameraStatusPollingSeconds).toBe(60);
+      expect(opts.statusPollingSeconds).toBe(60);
     });
 
     it('maps camera-motion-polling-seconds to motionPollingSeconds', () => {
