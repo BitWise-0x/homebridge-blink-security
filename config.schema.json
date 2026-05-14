@@ -58,11 +58,13 @@
       "hide-cameras": {
         "title": "Hide Camera Accessories",
         "placeholder": false,
+        "description": "Removes cameras from HomeKit. Any associated automations/scenes will have to be recreated if you want them back later.",
         "type": "boolean"
       },
       "hide-doorbells": {
         "title": "Hide Doorbell Accessories",
         "placeholder": false,
+        "description": "Removes doorbells from HomeKit. Any associated automations/scenes will have to be recreated if you want them back later.",
         "type": "boolean"
       },
       "enable-liveview": {
