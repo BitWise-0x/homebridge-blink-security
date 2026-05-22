@@ -193,11 +193,6 @@ export class CameraAccessory {
     }
   }
 
-  private applyConfiguredName(service: Service, name: string): void {
-    service.addOptionalCharacteristic(this.Characteristic.ConfiguredName);
-    service.setCharacteristic(this.Characteristic.ConfiguredName, name);
-  }
-
   private setupMotionSensor(): void {
     const name = `${this.camera.name} Motion`;
     const motionService =
@@ -207,8 +202,6 @@ export class CameraAccessory {
         name,
         `motion.${this.camera.serial}`
       );
-
-    this.applyConfiguredName(motionService, name);
 
     motionService
       .getCharacteristic(this.Characteristic.MotionDetected)
@@ -224,8 +217,6 @@ export class CameraAccessory {
         name,
         `battery-sensor.${this.camera.serial}`
       );
-
-    this.applyConfiguredName(batteryService, name);
 
     batteryService
       .getCharacteristic(this.Characteristic.StatusLowBattery)
@@ -250,8 +241,6 @@ export class CameraAccessory {
         `temp-sensor.${this.camera.serial}`
       );
 
-    this.applyConfiguredName(tempService, name);
-
     tempService
       .getCharacteristic(this.Characteristic.CurrentTemperature)
       .setProps({ minValue: -100 });
@@ -269,8 +258,6 @@ export class CameraAccessory {
         name,
         `enabled.${this.camera.serial}`
       );
-
-    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -290,8 +277,6 @@ export class CameraAccessory {
         `privacy.${this.camera.serial}`
       );
 
-    this.applyConfiguredName(service, name);
-
     service
       .getCharacteristic(this.Characteristic.On)
       .onGet(() => this.camera.privacyMode)
@@ -310,8 +295,6 @@ export class CameraAccessory {
         `nightvision.${this.camera.serial}`
       );
 
-    this.applyConfiguredName(service, name);
-
     service
       .getCharacteristic(this.Characteristic.On)
       .onGet(() => this.camera.nightVision)
@@ -329,8 +312,6 @@ export class CameraAccessory {
         name,
         `record.${this.camera.serial}`
       );
-
-    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)

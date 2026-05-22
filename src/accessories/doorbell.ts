@@ -175,11 +175,6 @@ export class DoorbellAccessory {
     this.accessory.configureController(this._controller);
   }
 
-  private applyConfiguredName(service: Service, name: string): void {
-    service.addOptionalCharacteristic(this.Characteristic.ConfiguredName);
-    service.setCharacteristic(this.Characteristic.ConfiguredName, name);
-  }
-
   private setupDoorbellService(): void {
     const name = `${this.doorbell.name} Doorbell`;
     this.doorbellService =
@@ -189,8 +184,6 @@ export class DoorbellAccessory {
         name,
         `doorbell.${this.doorbell.serial}`
       );
-
-    this.applyConfiguredName(this.doorbellService, name);
 
     this.doorbellService
       .getCharacteristic(this.Characteristic.ProgrammableSwitchEvent)
@@ -219,8 +212,6 @@ export class DoorbellAccessory {
         `motion.${this.doorbell.serial}`
       );
 
-    this.applyConfiguredName(motionService, name);
-
     motionService
       .getCharacteristic(this.Characteristic.MotionDetected)
       .onGet(async () => this.doorbell.getMotionDetected());
@@ -235,8 +226,6 @@ export class DoorbellAccessory {
         name,
         `enabled.${this.doorbell.serial}`
       );
-
-    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -256,8 +245,6 @@ export class DoorbellAccessory {
         `privacy.${this.doorbell.serial}`
       );
 
-    this.applyConfiguredName(service, name);
-
     service
       .getCharacteristic(this.Characteristic.On)
       .onGet(() => this.doorbell.privacyMode)
@@ -275,8 +262,6 @@ export class DoorbellAccessory {
         name,
         `record.${this.doorbell.serial}`
       );
-
-    this.applyConfiguredName(service, name);
 
     service
       .getCharacteristic(this.Characteristic.On)

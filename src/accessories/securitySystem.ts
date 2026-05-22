@@ -143,14 +143,6 @@ export class SecuritySystemAccessory {
         `armed.${this.network.serial}`
       );
 
-    this.armSwitchService.addOptionalCharacteristic(
-      this.Characteristic.ConfiguredName
-    );
-    this.armSwitchService.setCharacteristic(
-      this.Characteristic.ConfiguredName,
-      name
-    );
-
     this.armSwitchService
       .getCharacteristic(this.Characteristic.On)
       .onGet(() => this.network.armed)
