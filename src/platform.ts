@@ -73,7 +73,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   }
 
   private async init(): Promise<void> {
-    this.log.info('Initializing Blink Security');
+    routineInfo(this.log, this.config, 'Initializing Blink Security');
 
     try {
       this.blink = await this.setupBlink();
@@ -103,7 +103,9 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         }
       }
 
-      this.log.info(
+      routineInfo(
+        this.log,
+        this.config,
         `Blink discovered: ${this.blink.networks.size} networks, ${this.blink.cameras.size} cameras, ${this.blink.doorbells.size} doorbells, ${this.blink.sirens.size} sirens`
       );
 
@@ -179,6 +181,9 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
           PLATFORM_NAME,
           staleAccessories
         );
+        this.log.info(
+          `Unregistering ${staleAccessories.length} stale accessories: ${staleAccessories.map(a => a.displayName).join(', ')}`
+        );
       }
 
       const cachedUUIDs = new Set(this.cachedAccessories.map(a => a.UUID));
@@ -195,7 +200,9 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         );
       }
 
-      this.log.info(
+      routineInfo(
+        this.log,
+        this.config,
         `Blink ready: ${accessories.length} total accessories (${newAccessories.length} new, ${staleAccessories.length} stale removed, ${this.cachedAccessories.length} cached)`
       );
 
@@ -265,27 +272,47 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
 
     // Try to use existing session
     if (authClient.isAuthenticated) {
-      this.log.info('Blink: Restored authenticated session');
+      routineInfo(
+        this.log,
+        this.config,
+        'Blink: Restored authenticated session'
+      );
     } else if (authClient.state === 'TOKEN_EXPIRED') {
       // Token expired — try refresh
-      this.log.info('Blink: Session expired, refreshing token...');
+      routineInfo(
+        this.log,
+        this.config,
+        'Blink: Session expired, refreshing token...'
+      );
       try {
         await authClient.refreshTokens();
-        this.log.info('Blink: Token refreshed successfully');
+        routineInfo(
+          this.log,
+          this.config,
+          'Blink: Token refreshed successfully'
+        );
       } catch {
         this.log.warn('Blink: Token refresh failed, re-authenticating...');
         await this.performAuth(authClient);
       }
     } else if (authClient.state === 'AWAITING_2FA' && this.config.pin) {
       // Run full auth + 2FA in a single session (session can't survive restarts)
-      this.log.info('Blink: Running full auth + 2FA flow...');
+      routineInfo(
+        this.log,
+        this.config,
+        'Blink: Running full auth + 2FA flow...'
+      );
       try {
         await authClient.authenticateWith2FA(
           this.rawConfig.username,
           this.rawConfig.password,
           this.config.pin
         );
-        this.log.info('Blink: Authentication + 2FA verification successful');
+        routineInfo(
+          this.log,
+          this.config,
+          'Blink: Authentication + 2FA verification successful'
+        );
       } catch (e) {
         this.log.error(String(e));
         throw new Error(
@@ -317,7 +344,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         this.rawConfig.username,
         this.rawConfig.password
       );
-      this.log.info('Blink: Authentication successful');
+      routineInfo(this.log, this.config, 'Blink: Authentication successful');
     } catch (e) {
       if (e instanceof BlinkAuth2FARequiredError) {
         this.log.warn(
