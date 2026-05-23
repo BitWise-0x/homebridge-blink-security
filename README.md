@@ -174,28 +174,28 @@ Blink requires two-factor authentication on first login:
 
 ## Configuration
 
-| Property                           | Type    | Default    | Description                                                                                                                                 |
-| ---------------------------------- | ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `username`                         | string  | _required_ | Blink account email                                                                                                                         |
-| `password`                         | string  | _required_ | Blink account password                                                                                                                      |
-| `pin`                              | string  |            | 2FA verification code (only needed once)                                                                                                    |
-| `hide-alarm`                       | boolean | `false`    | Hide the SecuritySystem accessory                                                                                                           |
-| `hide-manual-arm-switch`           | boolean | `false`    | Hide the manual arm/disarm switch                                                                                                           |
-| `hide-temperature-sensor`          | boolean | `false`    | Hide temperature sensors on cameras                                                                                                         |
-| `hide-enabled-switch`              | boolean | `false`    | Hide motion enabled/disabled switch                                                                                                         |
-| `hide-privacy-switch`              | boolean | `false`    | Hide privacy mode switch                                                                                                                    |
-| `hide-cameras`                     | boolean | `false`    | Removes cameras from HomeKit. Rooms, automations, scenes, and custom names will not be restored if toggled back off                         |
-| `hide-doorbells`                   | boolean | `false`    | Removes doorbells from HomeKit. Rooms, automations, scenes, and custom names will not be restored if toggled back off                       |
-| `enable-liveview`                  | boolean | `true`     | Enable IMMI live view streaming                                                                                                             |
-| `enable-audio`                     | boolean | `false`    | Enable one-way audio in Live View. Also requires Audio Streaming in the Blink app under Device Settings → Privacy                           |
-| `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud                                                                                                         |
-| `disable-thumbnail-refresh`        | boolean | `false`    | Disable automatic thumbnail refresh                                                                                                         |
-| `blink-status-polling-seconds`     | integer | `10`       | Seconds between Blink system refreshes (range 1–300). Default 10. Higher values reduce API load but delay arm/disarm state updates          |
-| `camera-thumbnail-refresh-seconds` | integer | `3600`     | Minimum seconds between Blink cloud thumbnail refreshes per camera (HomeKit polls and is served cached thumbnails between refreshes)        |
-| `camera-status-polling-seconds`    | integer | `30`       | Camera status polling interval in seconds                                                                                                   |
-| `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds                                                                                                |
-| `logging`                          | string  |            | `"quiet"` suppresses routine chatter (thumbnail refresh, reconfigure, clip recording, sleep). `"verbose"` or `"debug"` for extended logging |
-| `enable-startup-diagnostic`        | boolean | `false`    | Log diagnostic info on startup                                                                                                              |
+| Property                           | Type    | Default    | Description                                                                                                                                                                      |
+| ---------------------------------- | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `username`                         | string  | _required_ | Blink account email                                                                                                                                                              |
+| `password`                         | string  | _required_ | Blink account password                                                                                                                                                           |
+| `pin`                              | string  |            | 2FA verification code (only needed once)                                                                                                                                         |
+| `hide-alarm`                       | boolean | `false`    | Hide the SecuritySystem accessory                                                                                                                                                |
+| `hide-manual-arm-switch`           | boolean | `false`    | Hide the manual arm/disarm switch                                                                                                                                                |
+| `hide-temperature-sensor`          | boolean | `false`    | Hide temperature sensors on cameras                                                                                                                                              |
+| `hide-enabled-switch`              | boolean | `false`    | Hide motion enabled/disabled switch                                                                                                                                              |
+| `hide-privacy-switch`              | boolean | `false`    | Hide privacy mode switch                                                                                                                                                         |
+| `hide-cameras`                     | boolean | `false`    | Removes cameras from HomeKit. Rooms, automations, scenes, and custom names will not be restored if toggled back off                                                              |
+| `hide-doorbells`                   | boolean | `false`    | Removes doorbells from HomeKit. Rooms, automations, scenes, and custom names will not be restored if toggled back off                                                            |
+| `enable-liveview`                  | boolean | `true`     | Enable IMMI live view streaming                                                                                                                                                  |
+| `enable-audio`                     | boolean | `false`    | Enable one-way audio in Live View. Also requires Audio Streaming in the Blink app under Device Settings → Privacy                                                                |
+| `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud                                                                                                                                              |
+| `disable-thumbnail-refresh`        | boolean | `false`    | Disable automatic thumbnail refresh                                                                                                                                              |
+| `blink-status-polling-seconds`     | integer | `10`       | Seconds between Blink system refreshes (range 1–300). Default 10. Lower values may trigger Blink rate-limiting; higher values reduce API load but delay arm/disarm state updates |
+| `camera-thumbnail-refresh-seconds` | integer | `3600`     | Minimum seconds between Blink cloud thumbnail refreshes per camera (HomeKit polls and is served cached thumbnails between refreshes)                                             |
+| `camera-status-polling-seconds`    | integer | `30`       | Camera status polling interval in seconds                                                                                                                                        |
+| `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds                                                                                                                                     |
+| `logging`                          | string  |            | `"quiet"` suppresses routine chatter (thumbnail refresh, reconfigure, clip recording, sleep). `"verbose"` or `"debug"` for extended logging                                      |
+| `enable-startup-diagnostic`        | boolean | `false`    | Log diagnostic info on startup                                                                                                                                                   |
 
 <br>
 
