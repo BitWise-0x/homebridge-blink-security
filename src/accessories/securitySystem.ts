@@ -134,14 +134,29 @@ export class SecuritySystemAccessory {
   }
 
   private setupArmSwitch(): void {
+    const existingSwitchService = this.accessory.getServiceById(
+      this.Service.Switch,
+      `armed.${this.network.serial}`
+    );
+
     const name = `${this.network.name} Arm`;
     this.armSwitchService =
-      this.accessory.getService(`armed.${this.network.serial}`) ||
+      existingSwitchService ||
       this.accessory.addService(
         this.Service.Switch,
         name,
         `armed.${this.network.serial}`
       );
+
+    if (!existingSwitchService) {
+      this.armSwitchService.addOptionalCharacteristic(
+        this.Characteristic.ConfiguredName
+      );
+      this.armSwitchService.setCharacteristic(
+        this.Characteristic.ConfiguredName,
+        name
+      );
+    }
 
     this.armSwitchService
       .getCharacteristic(this.Characteristic.On)

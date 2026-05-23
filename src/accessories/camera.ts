@@ -193,15 +193,29 @@ export class CameraAccessory {
     }
   }
 
+  private applyConfiguredName(service: Service, name: string): void {
+    service.addOptionalCharacteristic(this.Characteristic.ConfiguredName);
+    service.setCharacteristic(this.Characteristic.ConfiguredName, name);
+  }
+
   private setupMotionSensor(): void {
+    const existingMotionService = this.accessory.getServiceById(
+      this.Service.MotionSensor,
+      `motion.${this.camera.serial}`
+    );
+
     const name = `${this.camera.name} Motion`;
     const motionService =
-      this.accessory.getService(this.Service.MotionSensor) ||
+      existingMotionService ||
       this.accessory.addService(
         this.Service.MotionSensor,
         name,
         `motion.${this.camera.serial}`
       );
+
+    if (!existingMotionService) {
+      this.applyConfiguredName(motionService, name);
+    }
 
     motionService
       .getCharacteristic(this.Characteristic.MotionDetected)
@@ -209,14 +223,23 @@ export class CameraAccessory {
   }
 
   private setupBattery(): void {
+    const existingBatteryService = this.accessory.getServiceById(
+      this.Service.Battery,
+      `battery-sensor.${this.camera.serial}`
+    );
+
     const name = `${this.camera.name} Battery`;
     const batteryService =
-      this.accessory.getService(this.Service.Battery) ||
+      existingBatteryService ||
       this.accessory.addService(
         this.Service.Battery,
         name,
         `battery-sensor.${this.camera.serial}`
       );
+
+    if (!existingBatteryService) {
+      this.applyConfiguredName(batteryService, name);
+    }
 
     batteryService
       .getCharacteristic(this.Characteristic.StatusLowBattery)
@@ -232,14 +255,23 @@ export class CameraAccessory {
   }
 
   private setupTemperatureSensor(): void {
+    const existingTempService = this.accessory.getServiceById(
+      this.Service.TemperatureSensor,
+      `temp-sensor.${this.camera.serial}`
+    );
+
     const name = `${this.camera.name} Temperature`;
     const tempService =
-      this.accessory.getService(this.Service.TemperatureSensor) ||
+      existingTempService ||
       this.accessory.addService(
         this.Service.TemperatureSensor,
         name,
         `temp-sensor.${this.camera.serial}`
       );
+
+    if (!existingTempService) {
+      this.applyConfiguredName(tempService, name);
+    }
 
     tempService
       .getCharacteristic(this.Characteristic.CurrentTemperature)
@@ -250,14 +282,23 @@ export class CameraAccessory {
   }
 
   private setupEnabledSwitch(): void {
+    const existingSwitchService = this.accessory.getServiceById(
+      this.Service.Switch,
+      `enabled.${this.camera.serial}`
+    );
+
     const name = `${this.camera.name} Motion Enabled`;
     const service =
-      this.accessory.getService(`enabled.${this.camera.serial}`) ||
+      existingSwitchService ||
       this.accessory.addService(
         this.Service.Switch,
         name,
         `enabled.${this.camera.serial}`
       );
+
+    if (!existingSwitchService) {
+      this.applyConfiguredName(service, name);
+    }
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -268,14 +309,23 @@ export class CameraAccessory {
   }
 
   private setupPrivacySwitch(): void {
+    const existingSwitchService = this.accessory.getServiceById(
+      this.Service.Switch,
+      `privacy.${this.camera.serial}`
+    );
+
     const name = `${this.camera.name} Privacy Mode`;
     const service =
-      this.accessory.getService(`privacy.${this.camera.serial}`) ||
+      existingSwitchService ||
       this.accessory.addService(
         this.Service.Switch,
         name,
         `privacy.${this.camera.serial}`
       );
+
+    if (!existingSwitchService) {
+      this.applyConfiguredName(service, name);
+    }
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -286,14 +336,23 @@ export class CameraAccessory {
   }
 
   private setupNightVisionSwitch(): void {
+    const existingSwitchService = this.accessory.getServiceById(
+      this.Service.Switch,
+      `nightvision.${this.camera.serial}`
+    );
+
     const name = `${this.camera.name} Night Vision`;
     const service =
-      this.accessory.getService(`nightvision.${this.camera.serial}`) ||
+      existingSwitchService ||
       this.accessory.addService(
         this.Service.Switch,
         name,
         `nightvision.${this.camera.serial}`
       );
+
+    if (!existingSwitchService) {
+      this.applyConfiguredName(service, name);
+    }
 
     service
       .getCharacteristic(this.Characteristic.On)
@@ -304,14 +363,23 @@ export class CameraAccessory {
   }
 
   private setupRecordClipSwitch(): void {
+    const existingSwitchService = this.accessory.getServiceById(
+      this.Service.Switch,
+      `record.${this.camera.serial}`
+    );
+
     const name = `${this.camera.name} Record Clip`;
     const service =
-      this.accessory.getService(`record.${this.camera.serial}`) ||
+      existingSwitchService ||
       this.accessory.addService(
         this.Service.Switch,
         name,
         `record.${this.camera.serial}`
       );
+
+    if (!existingSwitchService) {
+      this.applyConfiguredName(service, name);
+    }
 
     service
       .getCharacteristic(this.Characteristic.On)
