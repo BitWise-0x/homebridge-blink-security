@@ -489,11 +489,9 @@ describe('BlinkAuthClient', () => {
       const client = new BlinkAuthClient('/tmp/test');
 
       mockHttpsRequest(200, csrfPage);
-      mockHttpsRequest(
-        418,
-        '{"error":"teapot"}',
-        { 'content-type': 'application/json' }
-      );
+      mockHttpsRequest(418, '{"error":"teapot"}', {
+        'content-type': 'application/json',
+      });
 
       await expect(client.authenticate('e@x.com', 'pw')).rejects.toThrow(
         /status 418.*diagnostic.*teapot/s
