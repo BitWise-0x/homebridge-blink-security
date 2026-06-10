@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.10.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.10.2...v1.10.3) (2026-06-10)
+
+### Bug Fixes
+
+* **auth:** treat Blink 202 signin responses as 2FA-required ([#43](https://github.com/BitWise-0x/homebridge-blink-security/issues/43)) ([9cbbed6](https://github.com/BitWise-0x/homebridge-blink-security/commit/9cbbed6617a8ffcb56516550a06dd935d09b9984)), closes [#41](https://github.com/BitWise-0x/homebridge-blink-security/issues/41)
+
 ## [1.10.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.10.1...v1.10.2) (2026-06-10)
 
 ### Bug Fixes
