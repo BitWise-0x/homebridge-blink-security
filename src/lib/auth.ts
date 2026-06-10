@@ -89,7 +89,6 @@ interface HttpResponse {
 }
 
 const MAX_REDIRECTS = 5;
-
 // Diagnostic: condense a signin response into a single log-safe line.
 // Used to surface the body/headers behind an unexpected status (e.g. 202),
 // where Blink's contract is undocumented and we can't tell the next step
@@ -319,8 +318,8 @@ export class BlinkAuthClient {
       password
     );
 
-    // 412 = 2FA required
-    if (credentialStatus === 412) {
+    // Blink uses either 202 or 412 to indicate that a 2FA challenge is pending.
+    if ([202, 412].includes(credentialStatus)) {
       this._state = 'AWAITING_2FA';
       this.saveSession();
       throw new BlinkAuth2FARequiredError(
@@ -368,7 +367,7 @@ export class BlinkAuthClient {
       );
     }
 
-    // Step 3: Submit credentials (expect 412 for 2FA)
+    // Step 3: Submit credentials (Blink returns 202 or 412 when 2FA is required)
     const { statusCode: credentialStatus, diag } = await this.submitCredentials(
       email,
       password
@@ -380,7 +379,7 @@ export class BlinkAuthClient {
       return;
     }
 
-    if (credentialStatus !== 412) {
+    if (![202, 412].includes(credentialStatus)) {
       throw new Error(
         `Blink OAuth sign-in failed with status ${credentialStatus}. ` +
           `Unrecognized signin response (diagnostic): ${diag}`

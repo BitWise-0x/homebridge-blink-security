@@ -448,7 +448,7 @@ describe('BlinkAuthClient', () => {
     const csrfPage =
       '<script id="oauth-args" type="application/json">{"csrf-token":"csrf-abc"}</script>';
 
-    it('surfaces body and headers when signin returns an unexpected status', async () => {
+    it('moves to AWAITING_2FA when signin returns 202', async () => {
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) =>
           typeof p === 'string' && p.includes('hardware_id') ? true : false
@@ -462,7 +462,7 @@ describe('BlinkAuthClient', () => {
 
       // Call 1: initOAuthSession (GET /authorize → signin page with CSRF)
       mockHttpsRequest(200, csrfPage);
-      // Call 2: submitCredentials (POST /signin) returns an unexpected 202
+      // Call 2: submitCredentials (POST /signin) returns Blink's 2FA-required 202
       mockHttpsRequest(
         202,
         '{"verification":"pending"}',
@@ -471,8 +471,83 @@ describe('BlinkAuthClient', () => {
       );
 
       await expect(client.authenticate('e@x.com', 'pw')).rejects.toThrow(
-        /status 202.*diagnostic.*verification.*pending/s
+        '2FA verification required'
       );
+      expect(client.state).toBe('AWAITING_2FA');
+    });
+
+    it('surfaces body and headers when signin returns an unexpected status', async () => {
+      (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+        (p: string) =>
+          typeof p === 'string' && p.includes('hardware_id') ? true : false
+      );
+      (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+        (p: string) =>
+          typeof p === 'string' && p.includes('hardware_id') ? 'hw-id' : ''
+      );
+
+      const client = new BlinkAuthClient('/tmp/test');
+
+      mockHttpsRequest(200, csrfPage);
+      mockHttpsRequest(
+        418,
+        '{"error":"teapot"}',
+        { 'content-type': 'application/json' }
+      );
+
+      await expect(client.authenticate('e@x.com', 'pw')).rejects.toThrow(
+        /status 418.*diagnostic.*teapot/s
+      );
+    });
+
+    it('completes authenticateWith2FA when signin returns 202', async () => {
+      (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+        (p: string) =>
+          typeof p === 'string' && p.includes('hardware_id') ? true : false
+      );
+      (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+        (p: string) =>
+          typeof p === 'string' && p.includes('hardware_id') ? 'hw-id' : ''
+      );
+
+      const client = new BlinkAuthClient('/tmp/test');
+
+      mockHttpsRequest(200, csrfPage);
+      mockHttpsRequest(
+        202,
+        '{"verification":"pending"}',
+        { 'content-type': 'application/json' },
+        '/oauth/v2/2fa'
+      );
+      mockHttpsRequest(201, '');
+      mockHttpsRequest(
+        302,
+        '',
+        {},
+        'immedia-blink://applinks.blink.com/signin/callback?code=auth-code-123'
+      );
+      mockHttpsRequest(
+        200,
+        JSON.stringify({
+          access_token: 'access-token',
+          refresh_token: 'refresh-token',
+          expires_in: 3600,
+          token_type: 'Bearer',
+        })
+      );
+      mockHttpsRequest(
+        200,
+        JSON.stringify({
+          tier: 'prod',
+          account_id: 12345,
+        })
+      );
+
+      await expect(
+        client.authenticateWith2FA('e@x.com', 'pw', '123456')
+      ).resolves.toBeUndefined();
+      expect(client.state).toBe('AUTHENTICATED');
+      expect(client.session?.accessToken).toBe('access-token');
     });
   });
 
