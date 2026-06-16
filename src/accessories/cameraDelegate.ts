@@ -193,9 +193,12 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         );
       }
     }
-    this.log.info(
-      `${this.blinkCamera.name} - LiveView: ${liveViewURL ?? 'unavailable'}`
-    );
+
+    if (liveViewURL) {
+      this.log.debug(`${this.blinkCamera.name} - LiveView: ${liveViewURL}`);
+    } else {
+      this.log.warn(`${this.blinkCamera.name} - LiveView: unavailable`);
+    }
 
     const urlRegex = /([a-z]+):\/\/([^:/]+)(?::[0-9]+)?(\/.*)/;
     if (liveViewURL?.startsWith('immis') && urlRegex.test(liveViewURL)) {
@@ -327,9 +330,11 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const phase = this.audioDisabledSessions.has(sessionID)
       ? 'RESTART (video-only)'
       : 'START';
-    this.log.info(
-      `${this.blinkCamera.name} - LiveView ${phase} (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps)`
-    );
+    if (!this.hideRoutineLogs) {
+      this.log.info(
+        `${this.blinkCamera.name} - LiveView ${phase} (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps)`
+      );
+    }
 
     const ffmpegArgs: string[] = [];
 
@@ -700,9 +705,11 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       ? ((Date.now() - startTime) / 1000).toFixed(1)
       : '?';
     this.streamStartTimes.delete(sessionID);
-    this.log.info(
-      `${this.blinkCamera.name} - LiveView STOP (streamed ${elapsed}s)`
-    );
+    if (!this.hideRoutineLogs) {
+      this.log.info(
+        `${this.blinkCamera.name} - LiveView STOP (streamed ${elapsed}s)`
+      );
+    }
 
     const timeout = this.streamTimeouts.get(sessionID);
     if (timeout) {
@@ -837,7 +844,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       isImmi: true,
     });
 
-    this.log.info(`${this.blinkCamera.name} - LiveView: ${liveViewURL}`);
+    this.log.debug(`${this.blinkCamera.name} - LiveView: ${liveViewURL}`);
 
     // Restore sessionInfo from cache so startStream can access it
     const sessionInfo = this.sessionInfoCache.get(sessionID);
