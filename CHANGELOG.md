@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.10.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.10.3...v1.10.4) (2026-06-17)
+
+### Bug Fixes
+
+* **proxy:** omit TLS SNI for IP IMMI hosts to silence DEP0123 ([#45](https://github.com/BitWise-0x/homebridge-blink-security/issues/45)) ([6c24a04](https://github.com/BitWise-0x/homebridge-blink-security/commit/6c24a042a304ffe0d138894be52a900843fc74ad))
+
 ## [1.10.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.10.2...v1.10.3) (2026-06-10)
 
 ### Bug Fixes
