@@ -732,7 +732,7 @@ export class ImmiTunnel {
       const tlsSocket = tls.connect({
         host: this._targetHost,
         port: this._tlsPort,
-        servername: this._targetHost,
+        servername: net.isIP(this._targetHost) ? undefined : this._targetHost,
         rejectUnauthorized: false,
         checkServerIdentity: () => undefined,
       });
