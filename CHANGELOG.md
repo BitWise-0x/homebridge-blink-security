@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.11.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.10.4...v1.11.0) (2026-06-19)
+
+### Features
+
+* **logs:** suppress additional routine logging ([#44](https://github.com/BitWise-0x/homebridge-blink-security/issues/44)) ([c003fa4](https://github.com/BitWise-0x/homebridge-blink-security/commit/c003fa4e419a98c6799e7fd30887971f1bca3d65))
+
 ## [1.10.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.10.3...v1.10.4) (2026-06-17)
 
 ### Bug Fixes
