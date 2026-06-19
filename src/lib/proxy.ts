@@ -441,7 +441,7 @@ class ImmiFrameStripper extends Transform {
         if (this._currentMsgType === IMMI_MSG_VIDEO) {
           if (!this._firstVideoLogged) {
             this._firstVideoLogged = true;
-            this._log?.info(`IMMI first video frame: ${toConsume} bytes`);
+            this._log?.debug(`IMMI first video frame: ${toConsume} bytes`);
           }
           this.push(this._buffer.subarray(0, toConsume));
         }
@@ -649,7 +649,7 @@ export class ImmiTunnel {
       this._serial
     );
     tlsSocket.write(connHeader);
-    this._log?.info(
+    this._log?.debug(
       `IMMI auth sent: clientId=${this._clientId}, connId=${this._connectionId}, serial=${this._serial} (${connHeader.length} bytes)`
     );
 
@@ -673,7 +673,7 @@ export class ImmiTunnel {
     let firstData = true;
     tlsSocket.on('data', (chunk: Buffer) => {
       if (firstData) {
-        this._log?.info(
+        this._log?.debug(
           `IMMI first data: ${chunk.length} bytes (first byte: 0x${chunk[0]?.toString(16).padStart(2, '0')})`
         );
         firstData = false;
