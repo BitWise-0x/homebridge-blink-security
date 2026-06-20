@@ -53,9 +53,11 @@ export class BlinkDoorbell extends BlinkCamera {
       return false;
     }
 
-    // If the API provides a source field, only treat "button" as a press.
+    // If the API provides a source field, only treat "button"/"button_press" as a press.
+    // The Blink API has been observed returning "button_press" for doorbell presses
+    // (rather than the previously assumed "button"), so both values are accepted.
     // Other sources (e.g. "pir", liveview) are not doorbell presses.
-    if (lastMotion.source && lastMotion.source !== 'button') {
+    if (lastMotion.source && !['button', 'button_press'].includes(lastMotion.source)) {
       return false;
     }
 
