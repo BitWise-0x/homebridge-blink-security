@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.11.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.0...v1.11.1) (2026-06-20)
+
+### Bug Fixes
+
+* **doorbell:** accept "button_press" source value for press detection ([886c5d5](https://github.com/BitWise-0x/homebridge-blink-security/commit/886c5d5a287dbab219e61c2735ebac21c8c3277d)), closes [#50](https://github.com/BitWise-0x/homebridge-blink-security/issues/50)
+
 ## [1.11.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.10.4...v1.11.0) (2026-06-19)
 
 ### Features
