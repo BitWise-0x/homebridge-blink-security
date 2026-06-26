@@ -12,7 +12,7 @@ import type { BlinkAuthClient } from '../lib/auth.js';
 import { DEFAULT_OPTIONS, type BlinkOptions } from '../lib/config.js';
 import { routineInfo } from '../lib/logInfo.js';
 import { BlinkNetwork, type NetworkData } from './network.js';
-import { BlinkCamera } from './camera.js';
+import { BlinkCamera, OWL_CODENAMES } from './camera.js';
 import { BlinkDoorbell } from './doorbell.js';
 import { BlinkSiren } from './siren.js';
 import { ExponentialBackoff } from '../lib/utils.js';
@@ -63,8 +63,11 @@ export class Blink {
     return new BlinkNetwork(data, this);
   }
 
-  protected createCamera(data: HomescreenCamera): BlinkCamera {
-    return new BlinkCamera(data, this);
+  protected createCamera(
+    data: HomescreenCamera,
+    isOwlDevice = false
+  ): BlinkCamera {
+    return new BlinkCamera(data, this, isOwlDevice);
   }
 
   protected createDoorbell(data: HomescreenCamera): BlinkDoorbell {
@@ -291,7 +294,7 @@ export class Blink {
         ])
       );
       this.cameras = new Map(
-        filteredCameras.map(c => [c.id, this.createCamera(c)])
+        filteredCameras.map(c => [c.id, this.createCamera(c, owlIds.has(c.id))])
       );
       this.doorbells = new Map(
         allDoorbells.map(d => [d.id, this.createDoorbell(d)])
@@ -302,15 +305,20 @@ export class Blink {
         this.log.debug(
           `Camera ${camera.cameraID} "${camera.data.name}" type=${camera.model}, isCameraMini=${camera.isCameraMini}`
         );
-        // A device in the homescreen `owls` array that isn't recognized as a
-        // mini will be routed to the legacy camera endpoint and 404 (issue #40,
-        // the "superior" floodlight). Warn so a new owl-family device type is
-        // visible without needing a raw homescreen dump.
-        if (owlIds.has(camera.cameraID) && !camera.isCameraMini) {
-          this.log.warn(
-            `Camera ${camera.cameraID} "${camera.data.name}" has unrecognized ` +
-              `owl type "${camera.model}"; motion enable/disable may fail. ` +
-              'Please report this type at ' +
+        // Owl-array members are already routed through the owl endpoints via
+        // `isOwlDevice`, so motion will work regardless of codename. But if the
+        // codename is new (not in OWL_CODENAMES), surface it so it can be
+        // documented — this is how we learned about #40 "superior" and #51
+        // "chickadee". Informational only; nothing is broken.
+        if (
+          owlIds.has(camera.cameraID) &&
+          !OWL_CODENAMES.includes(camera.model ?? '')
+        ) {
+          this.log.info(
+            `Camera ${camera.cameraID} "${camera.data.name}" reports a new ` +
+              `owl-family type "${camera.model}". Motion control is handled ` +
+              'automatically, but please report this type so it can be ' +
+              'documented: ' +
               'https://github.com/BitWise-0x/homebridge-blink-security/issues'
           );
         }
@@ -363,12 +371,38 @@ export class Blink {
         `enabled=${enabled} → ${route} endpoint`
     );
 
-    await this.api.lock(
-      `setCameraMotionSensorState(${networkID}, ${cameraID})`,
-      async () => {
-        await this.api.command(networkID, cmd);
+    try {
+      await this.api.lock(
+        `setCameraMotionSensorState(${networkID}, ${cameraID})`,
+        async () => {
+          await this.api.command(networkID, cmd);
+        }
+      );
+    } catch (err) {
+      // Surface motion-routing failures with enough context to diagnose a
+      // mis-routed owl-family device (issues #40, #51). If an owl-routed
+      // command fails, the codename likely needs a path variant we don't
+      // yet handle (e.g. /superior/ for floodlights) — log it so it can be
+      // reported rather than failing silently behind a generic HomeKit error.
+      const detail =
+        `camera ${cameraID} "${camera?.data.name}" (type=${camera?.model}, ` +
+        `owlArrayMember=${camera?.isOwlDevice ?? false}) via ${route} endpoint`;
+      if (camera?.isCameraMini) {
+        this.log.error(
+          `Failed to set motion ${enabled ? 'enable' : 'disable'} for ${detail}. ` +
+            'This owl-family device may need an endpoint variant this plugin ' +
+            'does not yet handle. Please report the camera type and this error ' +
+            'at https://github.com/BitWise-0x/homebridge-blink-security/issues — ' +
+            `cause: ${err instanceof Error ? err.message : String(err)}`
+        );
+      } else {
+        this.log.error(
+          `Failed to set motion ${enabled ? 'enable' : 'disable'} for ${detail} — ` +
+            `cause: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
-    );
+      throw err;
+    }
 
     await this.refreshData(true);
   }

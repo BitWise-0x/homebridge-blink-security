@@ -3,15 +3,27 @@ import type { BlinkNetwork } from './network.js';
 import { type Blink, ARMED_DELAY, MOTION_TRIGGER_DECAY } from './index.js';
 import { fahrenheitToCelsius } from '../lib/utils.js';
 
+// Known owl-family device codenames. This is a fallback only: the
+// authoritative signal is membership in the homescreen `owls` array (see
+// `isOwlDevice`). Amazon assigns a new bird codename per hardware revision
+// (owl=Mini, hawk=Mini 2, superior=Wired Floodlight, chickadee=Mini 2K+),
+// so routing by codename alone breaks on every new model (issues #40, #51).
+export const OWL_CODENAMES = ['owl', 'hawk', 'superior', 'chickadee'];
+
 export class BlinkCamera extends BlinkDevice {
   readonly id: number;
   blink: Blink;
+  // True when this device was found in the homescreen `owls` array. This is
+  // the reliable discriminator for routing through the owl endpoint family,
+  // regardless of whether its codename is in OWL_CODENAMES.
+  readonly isOwlDevice: boolean;
   private cacheThumbnail = new Map<string, Buffer>();
 
-  constructor(data: HomescreenCamera, blink: Blink) {
+  constructor(data: HomescreenCamera, blink: Blink, isOwlDevice = false) {
     super(data);
     this.id = data.id;
     this.blink = blink;
+    this.isOwlDevice = isOwlDevice;
   }
 
   override get data(): HomescreenCamera {
@@ -129,7 +141,7 @@ export class BlinkCamera extends BlinkDevice {
   }
 
   get isCameraMini(): boolean {
-    return ['owl', 'hawk', 'superior'].includes(this.model ?? '');
+    return this.isOwlDevice || OWL_CODENAMES.includes(this.model ?? '');
   }
 
   get isHawk(): boolean {

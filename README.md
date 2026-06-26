@@ -42,7 +42,8 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 | 📷 Blink XT / XT2         | `white`, `xt`         | <ul><li>Live view (RTSP, video only)</li><li>Motion sensor</li><li>Snapshots</li><li>Temperature</li><li>Battery level</li><li>Night vision</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul> |
 | 📸 Blink Mini             | `owl`                 | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
 | 📸 Blink Mini 2           | `hawk`                | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
-| 🔦 Blink Wired Floodlight | `superior_owl`        | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
+| 📸 Blink Mini 2K+         | `chickadee`           | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
+| 🔦 Blink Wired Floodlight | `superior`            | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                                                    |
 | 🚪 Blink Video Doorbell   | `lotus`               | <ul><li>Live view (IMMI) + audio</li><li>Motion sensor</li><li>Snapshots</li><li>Doorbell press notification</li><li>Clip recording</li><li>Privacy mode</li><li>Motion enable/disable</li></ul>                                |
 | 🚨 Blink Siren            | siren                 | <ul><li>On/off switch</li></ul>                                                                                                                                                                                                 |
 
@@ -114,7 +115,7 @@ graph TD
 - **Night vision** — IR illuminator toggle (Outdoor/Indoor models)
 - **Clip recording** — Trigger a clip recording via momentary switch
 - **Live View clip saving** — Configurable per-network `lv_save` toggle to save or suppress Live View clips
-- **One-way audio** — Listen-in on IMMI cameras (Mini, Mini 2, Outdoor/Indoor, Doorbell, Floodlight) transcoded to AAC-ELD for HomeKit
+- **One-way audio** — Listen-in on IMMI cameras (Mini, Mini 2, Mini 2K+, Outdoor/Indoor, Doorbell, Floodlight) transcoded to AAC-ELD for HomeKit
 - **OAuth 2.0 + PKCE** — Token refresh and persistent sessions across restarts
 - **2FA** — One-time PIN verification for Blink's two-factor auth
 - **Snapshot fallback** — Streams the last thumbnail when live view is unavailable
@@ -243,7 +244,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/e
 
 ### No Audio in Live View
 
-One-way audio is supported on IMMI cameras (Mini, Mini 2, Outdoor/Indoor, Doorbell, Wired Floodlight). XT / XT2 cameras use RTSP and are video-only.
+One-way audio is supported on IMMI cameras (Mini, Mini 2, Mini 2K+, Outdoor/Indoor, Doorbell, Wired Floodlight). XT / XT2 cameras use RTSP and are video-only.
 
 Audio is opt-in. To enable it:
 
