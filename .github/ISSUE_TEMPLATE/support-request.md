@@ -2,7 +2,6 @@
 name: Support Request
 about: Need help?
 title: ''
-labels: question
 assignees: 'BitWise-0x'
 ---
 
