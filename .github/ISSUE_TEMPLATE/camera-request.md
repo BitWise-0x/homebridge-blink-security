@@ -2,7 +2,6 @@
 name: Camera Request
 about: Request support for a new Blink camera model
 title: 'New camera: '
-labels: [enhancement, camera request]
 assignees: BitWise-0x
 ---
 
