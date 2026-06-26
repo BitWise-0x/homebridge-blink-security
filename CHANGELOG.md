@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.11.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.1...v1.11.2) (2026-06-26)
+
+### Bug Fixes
+
+* **camera:** route owl-family motion by owls-array membership ([#51](https://github.com/BitWise-0x/homebridge-blink-security/issues/51)) ([2d92d30](https://github.com/BitWise-0x/homebridge-blink-security/commit/2d92d302b4949e97a4410fbd8d6a84cb11c9cc50)), closes [#40](https://github.com/BitWise-0x/homebridge-blink-security/issues/40) [#40](https://github.com/BitWise-0x/homebridge-blink-security/issues/40)
+
 ## [1.11.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.0...v1.11.1) (2026-06-20)
 
 ### Bug Fixes
