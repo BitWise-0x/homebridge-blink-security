@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.1...v1.12.0-beta.2) (2026-07-22)
+
+### Bug Fixes
+
+* **motion:** make local storage manifest polling resilient to busy networks ([#55](https://github.com/BitWise-0x/homebridge-blink-security/issues/55)) ([5c370aa](https://github.com/BitWise-0x/homebridge-blink-security/commit/5c370aa8b0cc88aca869db3fb5618caad406c941))
+
 ## [1.12.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.2...v1.12.0-beta.1) (2026-07-22)
 
 ### Features
