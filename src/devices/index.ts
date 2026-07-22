@@ -40,6 +40,7 @@ export const DOORBELL_DEVICE_TYPE = 'lotus';
 // (command POST + completion polling + manifest GET), so it runs on its own
 // slower cadence than the main refresh loop.
 export const LOCAL_STORAGE_POLL = 30;
+export const LOCAL_STORAGE_STARTUP_DELAY = 90;
 
 export class Blink {
   readonly api: BlinkApi;
@@ -395,12 +396,18 @@ export class Blink {
         (mode === 'always' || cloudMediaEmpty === true);
 
       const state = this.localStorageState.get(network.networkID) ?? {
-        nextPollAt: 0,
+        // Defer the first manifest attempt past the startup thumbnail
+        // refresh burst — every camera's refresh is a network command, and
+        // the manifest request would spend its whole busy-retry window
+        // colliding with them.
+        nextPollAt: Date.now() + LOCAL_STORAGE_STARTUP_DELAY * 1000,
         backoff: new ExponentialBackoff(
           LOCAL_STORAGE_POLL * 1000,
           10 * 60 * 1000
         ),
         active: false,
+        inFlight: false,
+        successLogged: false,
       };
       this.localStorageState.set(network.networkID, state);
 
@@ -422,44 +429,78 @@ export class Blink {
         );
       }
 
-      if (Date.now() < state.nextPollAt) {
+      if (state.inFlight || Date.now() < state.nextPollAt) {
         continue;
       }
 
-      try {
-        await this.readLocalStorageManifest(network);
-        state.backoff.reset();
-        state.nextPollAt = Date.now() + LOCAL_STORAGE_POLL * 1000;
-      } catch (err) {
-        const msg = `${network.name}: local storage manifest poll failed: ${err}`;
-        if (state.backoff.attempt === 0) {
-          this.log.warn(msg);
-        } else {
-          this.log.debug(msg);
-        }
-        state.nextPollAt = Date.now() + state.backoff.delayMs;
-        state.backoff.increment();
-      }
+      // Fire-and-forget: the manifest flow can spend up to a minute in
+      // busy retries and must never stall the main poll loop (arm state,
+      // cloud motion, press checks).
+      state.inFlight = true;
+      this.readLocalStorageManifest(network)
+        .then(clipCount => {
+          state.backoff.reset();
+          state.nextPollAt = Date.now() + LOCAL_STORAGE_POLL * 1000;
+          if (!state.successLogged) {
+            state.successLogged = true;
+            this.log.info(
+              `${network.name}: local storage manifest read (${clipCount} clips)`
+            );
+          }
+        })
+        .catch(err => {
+          const msg = `${network.name}: local storage manifest poll failed: ${err}`;
+          // Keep failures visible without spamming: warn on the first and
+          // then once per backoff plateau, debug in between.
+          if (state.backoff.attempt === 0 || state.backoff.attempt % 5 === 0) {
+            this.log.warn(msg);
+          } else {
+            this.log.debug(msg);
+          }
+          state.nextPollAt = Date.now() + state.backoff.delayMs;
+          state.backoff.increment();
+        })
+        .finally(() => {
+          state.inFlight = false;
+        });
     }
   }
 
-  private async readLocalStorageManifest(network: BlinkNetwork): Promise<void> {
+  private async readLocalStorageManifest(
+    network: BlinkNetwork
+  ): Promise<number> {
     const networkID = network.networkID;
     const syncModuleID = network.syncModule!.id;
 
     let requestID: number | undefined;
-    await this.api.lock(`localStorageManifest(${networkID})`, async () => {
-      await this.api.command(networkID, async () => {
-        const res = await this.api.requestLocalStorageManifest(
-          networkID,
-          syncModuleID
-        );
-        requestID = res.id ?? res.command_id;
-        return res;
-      });
-    });
+    const status = await this.api.lock(
+      `localStorageManifest(${networkID})`,
+      async () => {
+        return this.api.command(networkID, async () => {
+          const res = await this.api.requestLocalStorageManifest(
+            networkID,
+            syncModuleID
+          );
+          // Busy retries re-run this closure with an id-less busy body;
+          // only capture a real id so a late busy response can't erase it.
+          const id = res.id ?? res.command_id;
+          if (id) {
+            requestID = id;
+          }
+          return res;
+        });
+      }
+    );
     if (!requestID) {
-      throw new Error('manifest request returned no id');
+      // command() returns undefined when the network command slot stayed
+      // busy for the whole retry window (e.g. thumbnail refreshes or the
+      // sync module recording); a present response without an id is a
+      // genuinely unexpected shape.
+      throw new Error(
+        status === undefined
+          ? 'system busy, will retry'
+          : 'manifest request returned no id'
+      );
     }
 
     const manifest = await this.api.getLocalStorageManifest(
@@ -467,9 +508,14 @@ export class Blink {
       syncModuleID,
       requestID
     );
+    // A busy 409 body is returned rather than thrown by the client; don't
+    // mistake it for a valid-but-empty manifest.
+    if (manifest.manifest_id === undefined && manifest.clips === undefined) {
+      throw new Error('manifest fetch returned no data');
+    }
     const clips = manifest.clips ?? [];
     if (clips.length === 0) {
-      return;
+      return 0;
     }
 
     const nameMap = buildLocalCameraNameMap(
@@ -498,6 +544,8 @@ export class Blink {
         );
       }
     }
+
+    return clips.length;
   }
 
   getLocalMediaTimestamp(cameraID: number): number {

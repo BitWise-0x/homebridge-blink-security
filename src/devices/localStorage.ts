@@ -12,6 +12,8 @@ export interface LocalStoragePollState {
   nextPollAt: number;
   backoff: ExponentialBackoff;
   active: boolean;
+  inFlight: boolean;
+  successLogged: boolean;
 }
 
 /**
