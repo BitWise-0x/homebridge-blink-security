@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.2...v1.12.0-beta.1) (2026-07-22)
+
+### Features
+
+* **motion:** fall back to sync module local storage for motion events ([#55](https://github.com/BitWise-0x/homebridge-blink-security/issues/55)) ([c556181](https://github.com/BitWise-0x/homebridge-blink-security/commit/c5561810afa668b2bf05cf51640d5a1649b7cd05))
+
 ## [1.11.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.1...v1.11.2) (2026-06-26)
 
 ### Bug Fixes
