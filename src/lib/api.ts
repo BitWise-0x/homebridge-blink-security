@@ -340,10 +340,26 @@ export class BlinkApi {
     );
   }
 
+  async getLocalStorageManifest(
+    networkID: number,
+    syncModuleID: number,
+    manifestRequestID: number
+  ): Promise<LocalStorageManifestResponse> {
+    return this.client.get<LocalStorageManifestResponse>(
+      `/api/v1/accounts/{accountID}/networks/${networkID}/sync_modules/${syncModuleID}/local_storage/manifest/request/${manifestRequestID}`,
+      0
+    );
+  }
+
   // --- Media ---
 
   async getMediaChange(maxTTL = 15): Promise<MediaChangeResponse> {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Round `since` down to the minute so the URL (and thus the client
+    // cache key) is stable across calls — a millisecond-precision timestamp
+    // makes every request unique and defeats the TTL cache entirely.
+    const since = new Date(
+      Math.floor(Date.now() / 60_000) * 60_000 - 24 * 60 * 60 * 1000
+    ).toISOString();
     return this.client.get<MediaChangeResponse>(
       `/api/v1/accounts/{accountID}/media/changed?since=${since}&page=0`,
       maxTTL
@@ -538,6 +554,9 @@ export interface SyncModule {
   status: string;
   last_hb: string;
   wifi_strength: number;
+  local_storage_enabled?: boolean;
+  local_storage_compatible?: boolean;
+  local_storage_status?: string;
 }
 
 export interface HomescreenCamera {
@@ -616,6 +635,19 @@ export interface MediaEntry {
   source?: string;
   thumbnail: string;
   media?: string;
+}
+
+export interface LocalStorageClip {
+  id: string;
+  camera_name: string;
+  created_at: string;
+  size?: string;
+}
+
+export interface LocalStorageManifestResponse {
+  version?: string;
+  manifest_id?: string;
+  clips?: LocalStorageClip[];
 }
 
 export interface CameraSignalsResponse {

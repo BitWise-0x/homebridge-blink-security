@@ -15,6 +15,13 @@ import { BlinkNetwork, type NetworkData } from './network.js';
 import { BlinkCamera, OWL_CODENAMES } from './camera.js';
 import { BlinkDoorbell } from './doorbell.js';
 import { BlinkSiren } from './siren.js';
+import {
+  buildLocalCameraNameMap,
+  clipToMediaEntry,
+  isLocalStorageActive,
+  toAlphanumeric,
+  type LocalStoragePollState,
+} from './localStorage.js';
 import { ExponentialBackoff } from '../lib/utils.js';
 
 export { BlinkDevice } from './base.js';
@@ -29,6 +36,10 @@ export const STATUS_POLL = 30;
 export const ARMED_DELAY = 60;
 export const MOTION_TRIGGER_DECAY = 90;
 export const DOORBELL_DEVICE_TYPE = 'lotus';
+// Local-storage manifest polling is heavier than the cloud media check
+// (command POST + completion polling + manifest GET), so it runs on its own
+// slower cadence than the main refresh loop.
+export const LOCAL_STORAGE_POLL = 30;
 
 export class Blink {
   readonly api: BlinkApi;
@@ -42,6 +53,10 @@ export class Blink {
   private readonly statusPoll: number;
   private readonly motionPoll: number;
   private readonly snapshotRate: number;
+  // Newest local-storage clip per camera, synthesized as MediaEntry so the
+  // existing motion consumers work unchanged (see getCameraLastMotion).
+  private readonly localMedia = new Map<number, MediaEntry>();
+  private readonly localStorageState = new Map<number, LocalStoragePollState>();
 
   constructor(
     authClient: BlinkAuthClient,
@@ -55,7 +70,13 @@ export class Blink {
     this.api = new BlinkApi(authClient, log, options);
     this.log = log;
     this.statusPoll = statusPoll ?? STATUS_POLL;
-    this.motionPoll = motionPoll ?? MOTION_POLL;
+    // Cap the media cache TTL at the poll cadence: a TTL longer than the
+    // poll interval makes every other cycle reuse stale media, doubling
+    // worst-case motion/doorbell notification latency for no API savings.
+    this.motionPoll = Math.min(
+      motionPoll ?? MOTION_POLL,
+      options.blinkStatusPollingSeconds || MOTION_POLL
+    );
     this.snapshotRate = snapshotRate ?? THUMBNAIL_TTL;
   }
 
@@ -325,6 +346,12 @@ export class Blink {
       }
     }
 
+    // Local-storage motion fallback (before press checks so fresh local
+    // entries feed the same cycle)
+    await this.pollLocalStorage().catch(err => {
+      this.log.debug(`Local storage poll failed: ${err}`);
+    });
+
     // Check for doorbell press events
     for (const doorbell of this.doorbells.values()) {
       await doorbell.checkForPress().catch(err => {
@@ -333,6 +360,149 @@ export class Blink {
     }
 
     return homescreen;
+  }
+
+  /**
+   * Poll the sync module local-storage manifest for new clips and surface
+   * them as motion events. This is the only motion source for accounts
+   * without Blink cloud clip storage (no subscription), where media/changed
+   * is always empty (#55). In "auto" mode the fallback engages only while
+   * the cloud media list is empty, so subscribers never pay the extra cost.
+   */
+  private async pollLocalStorage(): Promise<void> {
+    const mode = this.options.localStorageMotion;
+    if (mode === 'never') {
+      return;
+    }
+
+    let cloudMediaEmpty: boolean | undefined;
+    if (mode === 'auto') {
+      // Same cached request the motion path makes — effectively free.
+      const res = await this.api
+        .getMediaChange(this.motionPoll)
+        .catch(() => undefined);
+      if (!res) {
+        return;
+      }
+      cloudMediaEmpty = (res.media || []).length === 0;
+    }
+
+    for (const network of this.networks.values()) {
+      const syncModule = network.syncModule;
+      const eligible =
+        isLocalStorageActive(syncModule) &&
+        syncModule!.status === 'online' &&
+        (mode === 'always' || cloudMediaEmpty === true);
+
+      const state = this.localStorageState.get(network.networkID) ?? {
+        nextPollAt: 0,
+        backoff: new ExponentialBackoff(
+          LOCAL_STORAGE_POLL * 1000,
+          10 * 60 * 1000
+        ),
+        active: false,
+      };
+      this.localStorageState.set(network.networkID, state);
+
+      if (!eligible) {
+        if (state.active) {
+          state.active = false;
+          this.log.info(
+            `${network.name}: local storage motion fallback deactivated`
+          );
+        }
+        continue;
+      }
+
+      if (!state.active) {
+        state.active = true;
+        this.log.info(
+          `${network.name}: no cloud clips available - using sync module ` +
+            'local storage for motion events'
+        );
+      }
+
+      if (Date.now() < state.nextPollAt) {
+        continue;
+      }
+
+      try {
+        await this.readLocalStorageManifest(network);
+        state.backoff.reset();
+        state.nextPollAt = Date.now() + LOCAL_STORAGE_POLL * 1000;
+      } catch (err) {
+        const msg = `${network.name}: local storage manifest poll failed: ${err}`;
+        if (state.backoff.attempt === 0) {
+          this.log.warn(msg);
+        } else {
+          this.log.debug(msg);
+        }
+        state.nextPollAt = Date.now() + state.backoff.delayMs;
+        state.backoff.increment();
+      }
+    }
+  }
+
+  private async readLocalStorageManifest(network: BlinkNetwork): Promise<void> {
+    const networkID = network.networkID;
+    const syncModuleID = network.syncModule!.id;
+
+    let requestID: number | undefined;
+    await this.api.lock(`localStorageManifest(${networkID})`, async () => {
+      await this.api.command(networkID, async () => {
+        const res = await this.api.requestLocalStorageManifest(
+          networkID,
+          syncModuleID
+        );
+        requestID = res.id ?? res.command_id;
+        return res;
+      });
+    });
+    if (!requestID) {
+      throw new Error('manifest request returned no id');
+    }
+
+    const manifest = await this.api.getLocalStorageManifest(
+      networkID,
+      syncModuleID,
+      requestID
+    );
+    const clips = manifest.clips ?? [];
+    if (clips.length === 0) {
+      return;
+    }
+
+    const nameMap = buildLocalCameraNameMap(
+      [...this.cameras.values(), ...this.doorbells.values()],
+      networkID
+    );
+
+    for (const clip of clips) {
+      const device = nameMap.get(toAlphanumeric(clip.camera_name ?? ''));
+      if (!device) {
+        this.log.debug(
+          `${network.name}: local clip for unmatched camera_name "${clip.camera_name}"`
+        );
+        continue;
+      }
+
+      const createdAt = Date.parse(clip.created_at) || 0;
+      const existing = this.localMedia.get(device.cameraID);
+      const existingAt = existing ? Date.parse(existing.created_at) || 0 : 0;
+      if (createdAt > existingAt) {
+        this.localMedia.set(device.cameraID, clipToMediaEntry(clip, device));
+        // Raw created_at logged so clock-skew/timezone issues are visible in
+        // debug logs from the field.
+        this.log.debug(
+          `${device.name}: new local storage clip (created_at=${clip.created_at})`
+        );
+      }
+    }
+  }
+
+  getLocalMediaTimestamp(cameraID: number): number {
+    const entry = this.localMedia.get(cameraID);
+    return entry ? Date.parse(entry.created_at) || 0 : 0;
   }
 
   async setArmedState(networkID: number, arm = true): Promise<void> {
@@ -555,7 +725,8 @@ export class Blink {
     const res = await this.api
       .getMediaChange(this.motionPoll)
       .catch(() => ({ media: [] }));
-    const media = (res.media || [])
+    const local = [...this.localMedia.values()];
+    const media = [...(res.media || []), ...local]
       .filter(m => !networkID || m.network_id === networkID)
       .filter(m => !cameraID || m.device_id === cameraID)
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));

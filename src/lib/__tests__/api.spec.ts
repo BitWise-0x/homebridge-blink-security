@@ -243,6 +243,27 @@ describe('BlinkApi', () => {
         '/api/v1/accounts/{accountID}/networks/7/state/disarm'
       );
     });
+
+    it('requestLocalStorageManifest uses correct path', async () => {
+      const mockPost = api.client.post as ReturnType<typeof vi.fn>;
+      mockPost.mockResolvedValue({ id: 1 });
+
+      await api.requestLocalStorageManifest(10, 555);
+      expect(mockPost).toHaveBeenCalledWith(
+        '/api/v1/accounts/{accountID}/networks/10/sync_modules/555/local_storage/manifest/request'
+      );
+    });
+
+    it('getLocalStorageManifest uses correct path and no cache', async () => {
+      const mockGet = api.client.get as ReturnType<typeof vi.fn>;
+      mockGet.mockResolvedValue({ clips: [] });
+
+      await api.getLocalStorageManifest(10, 555, 77);
+      expect(mockGet).toHaveBeenCalledWith(
+        '/api/v1/accounts/{accountID}/networks/10/sync_modules/555/local_storage/manifest/request/77',
+        0
+      );
+    });
   });
 
   describe('updateNetworkLvSave fallback', () => {

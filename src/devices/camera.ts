@@ -161,8 +161,14 @@ export class BlinkCamera extends BlinkDevice {
       return false;
     }
 
+    // Local-storage clips don't bump the homescreen updated_at, so their
+    // timestamp participates in the staleness gate directly.
     const lastDeviceUpdate =
-      Math.max(this.updatedAt, this.network?.updatedAt ?? 0) +
+      Math.max(
+        this.updatedAt,
+        this.network?.updatedAt ?? 0,
+        this.blink.getLocalMediaTimestamp(this.cameraID)
+      ) +
       MOTION_TRIGGER_DECAY * 1000;
     if (Date.now() > lastDeviceUpdate) {
       return false;

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { BlinkCamera } from '../index.js';
+import { LOCAL_STORAGE_SOURCE } from '../localStorage.js';
 import type { HomescreenCamera } from '../base.js';
 
 type Blink = ConstructorParameters<typeof BlinkCamera>[1];
@@ -65,5 +66,62 @@ describe('BlinkCamera device-type classification', () => {
 
   it('does not treat an unknown codename as a mini unless it is an owl-array member', () => {
     expect(makeCamera('catalina', false).isCameraMini).toBe(false);
+  });
+});
+
+describe('BlinkCamera.getMotionDetected with local storage events', () => {
+  // Regression for issue #55: local-storage clips don't bump the homescreen
+  // updated_at, so the staleness gate must also consider the local media
+  // timestamp or manifest-sourced motion is silently suppressed.
+  const staleIso = '2026-01-01T00:00:00Z';
+
+  function makeArmedCamera(localMediaTimestamp: number): {
+    camera: BlinkCamera;
+    getCameraLastMotion: ReturnType<typeof vi.fn>;
+  } {
+    const data: HomescreenCamera = {
+      id: 42,
+      network_id: 100,
+      name: 'Front Door',
+      serial: 'TEST0042',
+      fw_version: '1.0.0',
+      type: 'camera',
+      enabled: true,
+      thumbnail: '',
+      status: 'online',
+      created_at: staleIso,
+      updated_at: staleIso,
+    };
+    const network = {
+      armed: true,
+      updatedAt: Date.parse(staleIso),
+      armedAt: Date.now() - 60 * 60 * 1000,
+    };
+    const getCameraLastMotion = vi.fn().mockResolvedValue({
+      created_at: new Date(localMediaTimestamp).toISOString(),
+      source: LOCAL_STORAGE_SOURCE,
+      device_id: 42,
+      network_id: 100,
+    });
+    const blink = {
+      networks: new Map([[100, network]]),
+      getCameraLastMotion,
+      getLocalMediaTimestamp: vi.fn().mockReturnValue(localMediaTimestamp),
+    } as unknown as Blink;
+    return { camera: new BlinkCamera(data, blink), getCameraLastMotion };
+  }
+
+  it('fires for a fresh local clip despite a stale homescreen updated_at', async () => {
+    const { camera } = makeArmedCamera(Date.now() - 5 * 1000);
+    await expect(camera.getMotionDetected()).resolves.toBe(true);
+  });
+
+  it('does not fire for a local clip older than the trigger decay', async () => {
+    const { camera, getCameraLastMotion } = makeArmedCamera(
+      Date.now() - 10 * 60 * 1000
+    );
+    await expect(camera.getMotionDetected()).resolves.toBe(false);
+    // Suppressed by the staleness gate before any media fetch.
+    expect(getCameraLastMotion).not.toHaveBeenCalled();
   });
 });

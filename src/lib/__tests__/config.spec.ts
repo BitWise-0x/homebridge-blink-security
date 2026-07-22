@@ -297,4 +297,32 @@ describe('normalizeConfig', () => {
       expect(opts.enableAudio).toBe(false);
     });
   });
+
+  describe('local-storage-motion', () => {
+    it('defaults to auto', () => {
+      const opts = normalizeConfig(makeConfig({}));
+      expect(opts.localStorageMotion).toBe('auto');
+    });
+
+    it('accepts always and never', () => {
+      expect(
+        normalizeConfig(makeConfig({ 'local-storage-motion': 'always' }))
+          .localStorageMotion
+      ).toBe('always');
+      expect(
+        normalizeConfig(makeConfig({ 'local-storage-motion': 'never' }))
+          .localStorageMotion
+      ).toBe('never');
+    });
+
+    it('falls back to auto for an invalid value', () => {
+      const opts = normalizeConfig(
+        makeConfig({
+          'local-storage-motion':
+            'bogus' as BlinkSecurityConfig['local-storage-motion'],
+        })
+      );
+      expect(opts.localStorageMotion).toBe('auto');
+    });
+  });
 });

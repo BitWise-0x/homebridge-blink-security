@@ -339,4 +339,70 @@ describe('BlinkClient', () => {
       await expect(client.get('/test', 0)).rejects.toThrow('409');
     });
   });
+
+  describe('in-flight GET deduplication', () => {
+    it('shares one network request between concurrent identical GETs', async () => {
+      let release!: (value: unknown) => void;
+      mockRequest.mockReturnValueOnce(
+        new Promise(resolve => {
+          release = resolve;
+        })
+      );
+
+      const first = client.get('/test', 15);
+      const second = client.get('/test', 15);
+      release({ status: 200, statusText: 'OK', data: { ok: true } });
+
+      expect(await first).toEqual({ ok: true });
+      expect(await second).toEqual({ ok: true });
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not deduplicate cacheless (TTL 0) requests', async () => {
+      mockRequest.mockResolvedValue({
+        status: 200,
+        statusText: 'OK',
+        data: { ok: true },
+      });
+
+      await Promise.all([client.get('/test', 0), client.get('/test', 0)]);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+    });
+
+    it('propagates a failure to all waiters and clears the slot', async () => {
+      let reject!: (err: Error) => void;
+      mockRequest.mockReturnValueOnce(
+        new Promise((_resolve, rej) => {
+          reject = rej;
+        })
+      );
+
+      const first = client.get('/test', 15);
+      const second = client.get('/test', 15);
+      reject(new Error('boom'));
+
+      await expect(first).rejects.toThrow('boom');
+      await expect(second).rejects.toThrow('boom');
+
+      // Slot cleared: a subsequent call issues a fresh request
+      mockRequest.mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        data: { ok: true },
+      });
+      await expect(client.get('/test', 15)).resolves.toEqual({ ok: true });
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not deduplicate requests for different paths', async () => {
+      mockRequest.mockResolvedValue({
+        status: 200,
+        statusText: 'OK',
+        data: { ok: true },
+      });
+
+      await Promise.all([client.get('/a', 15), client.get('/b', 15)]);
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+    });
+  });
 });

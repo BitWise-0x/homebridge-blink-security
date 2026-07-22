@@ -134,6 +134,17 @@
         "default": false,
         "description": "Enable one-way audio in HomeKit Live View. Requires Audio Streaming to also be enabled in the Blink app under Device Settings → Privacy.",
         "type": "boolean"
+      },
+      "local-storage-motion": {
+        "title": "Local Storage Motion Detection",
+        "type": "string",
+        "default": "auto",
+        "description": "Detect motion from Sync Module local (USB) storage clips for accounts without a Blink cloud subscription. Auto activates only when no cloud clips are available. Doorbell button presses are reported as motion on this path.",
+        "oneOf": [
+          { "title": "Auto (use when no cloud clips)", "enum": ["auto"] },
+          { "title": "Always", "enum": ["always"] },
+          { "title": "Never", "enum": ["never"] }
+        ]
       }
     },
     "required": ["username", "password"]
@@ -176,6 +187,7 @@
         "camera-thumbnail-refresh-seconds",
         "camera-status-polling-seconds",
         "camera-motion-polling-seconds",
+        "local-storage-motion",
         "logging",
         "enable-startup-diagnostic"
       ]

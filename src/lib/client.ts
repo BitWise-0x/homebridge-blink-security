@@ -19,6 +19,7 @@ export class BlinkClient {
   private readonly log: Logger;
   private readonly client: AxiosInstance;
   private readonly cache = new Map<string, CacheEntry>();
+  private readonly inflight = new Map<string, Promise<unknown>>();
 
   constructor(authClient: BlinkAuthClient, log: Logger) {
     this.authClient = authClient;
@@ -61,7 +62,28 @@ export class BlinkClient {
   }
 
   async get<T = unknown>(path: string, maxTTL = 1): Promise<T> {
-    return this._request<T>('GET', path, undefined, maxTTL);
+    if (maxTTL <= 0) {
+      return this._request<T>('GET', path, undefined, maxTTL);
+    }
+
+    // Deduplicate concurrent identical GETs: the result cache only stores
+    // completed responses, so N simultaneous callers (e.g. HomeKit snapshot
+    // requests for every camera at once) would otherwise all miss and all
+    // hit the network. Cacheless (TTL 0) requests like command status polls
+    // are never deduplicated.
+    const key = `GET:${this.resolvePath(path)}`;
+    const pending = this.inflight.get(key);
+    if (pending) {
+      return pending as Promise<T>;
+    }
+
+    const request = this._request<T>('GET', path, undefined, maxTTL).finally(
+      () => {
+        this.inflight.delete(key);
+      }
+    );
+    this.inflight.set(key, request);
+    return request;
   }
 
   async post<T = unknown>(path: string, body?: unknown): Promise<T> {

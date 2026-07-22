@@ -106,8 +106,25 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       routineInfo(
         this.log,
         this.config,
-        `Blink discovered: ${this.blink.networks.size} networks, ${this.blink.cameras.size} cameras, ${this.blink.doorbells.size} doorbells, ${this.blink.sirens.size} sirens`
+        `Blink discovered: ${this.blink.networks.size} networks, ` +
+          `${this.blink.cameras.size} cameras, ` +
+          `${this.blink.doorbells.size} doorbells, ` +
+          `${this.blink.sirens.size} sirens`
       );
+
+      for (const network of this.blink.networks.values()) {
+        const sm = network.syncModule;
+        const localStorage =
+          `compatible=${sm?.local_storage_compatible ?? 'n/a'}, ` +
+          `enabled=${sm?.local_storage_enabled ?? 'n/a'}, ` +
+          `status=${sm?.local_storage_status ?? 'n/a'}`;
+        routineInfo(
+          this.log,
+          this.config,
+          `Blink ${network.name} - Local storage: ${localStorage} ` +
+            `(motion fallback: ${this.config.localStorageMotion})`
+        );
+      }
 
       const accessories: PlatformAccessory[] = [];
 
@@ -203,7 +220,10 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       routineInfo(
         this.log,
         this.config,
-        `Blink ready: ${accessories.length} total accessories (${newAccessories.length} new, ${staleAccessories.length} stale removed, ${this.cachedAccessories.length} cached)`
+        `Blink ready: ${accessories.length} total accessories ` +
+          `(${newAccessories.length} new, ` +
+          `${staleAccessories.length} stale removed, ` +
+          `${this.cachedAccessories.length} cached)`
       );
 
       this.schedulePoll();

@@ -21,7 +21,10 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   logging?: 'quiet' | 'verbose' | 'debug';
   'enable-startup-diagnostic'?: boolean;
   'enable-audio'?: boolean;
+  'local-storage-motion'?: 'auto' | 'always' | 'never';
 }
+
+export type LocalStorageMotionMode = 'auto' | 'always' | 'never';
 
 export interface BlinkOptions {
   username: string;
@@ -47,6 +50,7 @@ export interface BlinkOptions {
   startupDiagnostic: boolean;
   enableAudio: boolean;
   hideRoutineLogs: boolean;
+  localStorageMotion: LocalStorageMotionMode;
 }
 
 export const DEFAULT_OPTIONS: BlinkOptions = {
@@ -72,6 +76,7 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   startupDiagnostic: false,
   enableAudio: false,
   hideRoutineLogs: false,
+  localStorageMotion: 'auto',
 };
 
 export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
@@ -131,6 +136,11 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   opts.hideRoutineLogs = config.logging === 'quiet';
   opts.verbose = ['verbose', 'debug'].includes(config.logging ?? '');
   opts.debug = config.logging === 'debug';
+
+  const lsMotion = config['local-storage-motion'];
+  if (lsMotion && ['auto', 'always', 'never'].includes(lsMotion)) {
+    opts.localStorageMotion = lsMotion;
+  }
 
   return opts;
 }
