@@ -9,12 +9,38 @@ permissions:
   contents: write # for checkout
 
 concurrency:
+  # Never cancel a release in progress: semantic-release publishes to npm before
+  # it tags and commits the changelog, so an interrupted run can leave a
+  # published version with no matching tag.
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: npm
+      - name: Install dependencies
+        run: npm clean-install
+      - name: Check formatting
+        run: npm run prettier
+      - name: Lint the project
+        run: npm run lint
+      - name: Run tests
+        run: npm test
+      - name: Build the project
+        run: npm run build
+
   release:
     name: Beta Release
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: write # to be able to publish a GitHub release
@@ -34,6 +60,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 'lts/*'
+          cache: npm
       - name: Install dependencies
         run: npm clean-install
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
