@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.4...v1.12.0-beta.5) (2026-07-23)
+
+### Bug Fixes
+
+* **devices:** correct local storage motion, device routing and accessory lifecycle ([0019ae2](https://github.com/BitWise-0x/homebridge-blink-security/commit/0019ae21b838fa397b50f51811820cbc936f1f05))
+
 ## [1.12.0-beta.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.3...v1.12.0-beta.4) (2026-07-23)
 
 ### Bug Fixes
