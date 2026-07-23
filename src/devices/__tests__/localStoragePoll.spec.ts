@@ -143,7 +143,9 @@ describe('Blink.pollLocalStorage', () => {
     expect(api.requestLocalStorageManifest).not.toHaveBeenCalled();
   });
 
-  it('reads the manifest and surfaces clips as motion after the delay', async () => {
+  // Regression for issue #56: clips already on the sync module when the
+  // plugin starts must not replay as motion events on the first read.
+  it('baselines the first manifest read without firing motion', async () => {
     const { blink, api, log, poll, state } = makeHarness();
     await poll();
     state()!.nextPollAt = 0;
@@ -152,13 +154,98 @@ describe('Blink.pollLocalStorage', () => {
 
     expect(api.requestLocalStorageManifest).toHaveBeenCalledWith(100, 555);
     expect(api.getLocalStorageManifest).toHaveBeenCalledWith(100, 555, 777);
-    expect(blink.getLocalMediaTimestamp(42)).toBeGreaterThan(0);
     expect(log.info).toHaveBeenCalledWith(
       expect.stringContaining('manifest read (1 clips)')
     );
 
+    // The entry is stored (thumbnails, later-read dedup) but carries no
+    // discovery stamp, so it cannot trip the motion window.
+    expect(blink.getLocalMediaTimestamp(42)).toBe(0);
     const entry = await blink.getCameraLastMotion(100, 42);
     expect(entry?.source).toBe('local_storage');
+  });
+
+  it('fires motion for a clip that appears after the baseline read', async () => {
+    const { blink, api, poll, state } = makeHarness();
+    const oldStart = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    api.getLocalStorageManifest.mockResolvedValue({
+      manifest_id: 'm1',
+      clips: [{ id: '1', camera_name: 'FrontDoor', created_at: oldStart }],
+    });
+
+    await poll();
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+    expect(blink.getLocalMediaTimestamp(42)).toBe(0);
+
+    const newStart = new Date().toISOString();
+    api.getLocalStorageManifest.mockResolvedValue({
+      manifest_id: 'm2',
+      clips: [
+        { id: '1', camera_name: 'FrontDoor', created_at: oldStart },
+        { id: '2', camera_name: 'FrontDoor', created_at: newStart },
+      ],
+    });
+    const before = Date.now();
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+
+    expect(blink.getLocalMediaTimestamp(42)).toBeGreaterThanOrEqual(before);
+    const entry = await blink.getCameraLastMotion(100, 42);
+    expect(entry?.created_at).toBe(newStart);
+  });
+
+  it('baselines an empty first read so the next clip fires', async () => {
+    const { blink, api, poll, state } = makeHarness();
+    api.getLocalStorageManifest.mockResolvedValue({
+      manifest_id: 'm1',
+      clips: [],
+    });
+
+    await poll();
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+    expect(blink.getLocalMediaTimestamp(42)).toBe(0);
+
+    api.getLocalStorageManifest.mockResolvedValue({
+      manifest_id: 'm2',
+      clips: [
+        {
+          id: '1',
+          camera_name: 'FrontDoor',
+          created_at: new Date().toISOString(),
+        },
+      ],
+    });
+    const before = Date.now();
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+
+    expect(blink.getLocalMediaTimestamp(42)).toBeGreaterThanOrEqual(before);
+  });
+
+  it('does not re-fire when a later read repeats the baseline clip', async () => {
+    const { blink, api, poll, state } = makeHarness();
+    const oldStart = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    api.getLocalStorageManifest.mockResolvedValue({
+      manifest_id: 'm1',
+      clips: [{ id: '1', camera_name: 'FrontDoor', created_at: oldStart }],
+    });
+
+    await poll();
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+
+    expect(blink.getLocalMediaTimestamp(42)).toBe(0);
   });
 
   it('treats a busy command timeout as a retryable failure', async () => {
@@ -258,14 +345,24 @@ describe('Blink.pollLocalStorage', () => {
 
   it('stamps discovery time so old recordings still count as fresh motion', async () => {
     const { blink, api, poll, state } = makeHarness();
-    const oldStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     api.getLocalStorageManifest.mockResolvedValue({
       manifest_id: 'm1',
+      clips: [],
+    });
+    await poll();
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+
+    // Post-baseline, a clip whose recording started long ago (issue #55:
+    // recording length + manifest lag can exceed the decay window) is
+    // stamped with its discovery time so it still fires.
+    const oldStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    api.getLocalStorageManifest.mockResolvedValue({
+      manifest_id: 'm2',
       clips: [{ id: '1', camera_name: 'FrontDoor', created_at: oldStart }],
     });
-
     const before = Date.now();
-    await poll();
     state()!.nextPollAt = 0;
     await poll();
     await flush();

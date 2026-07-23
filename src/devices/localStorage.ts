@@ -14,6 +14,10 @@ export interface LocalStoragePollState {
   active: boolean;
   inFlight: boolean;
   successLogged: boolean;
+  // False until the first successful manifest read. Clips present on that
+  // read predate the plugin (or slipped in during the startup window) and
+  // must not replay as motion events (#56).
+  baselined: boolean;
 }
 
 /**

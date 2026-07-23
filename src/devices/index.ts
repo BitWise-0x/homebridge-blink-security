@@ -59,7 +59,9 @@ export class Blink {
   // discoveredAt drives the motion trigger window: a clip's created_at is
   // its recording START time and can already be older than the 90s decay by
   // the time the manifest surfaces it (recording length + manifest lag +
-  // poll cadence), which would silently drop the event.
+  // poll cadence), which would silently drop the event. discoveredAt of 0
+  // marks a baseline clip (seen on the first manifest read, #56): stored
+  // for thumbnails and dedup, never motion.
   private readonly localMedia = new Map<
     number,
     { entry: MediaEntry; discoveredAt: number }
@@ -415,6 +417,7 @@ export class Blink {
         active: false,
         inFlight: false,
         successLogged: false,
+        baselined: false,
       };
       this.localStorageState.set(network.networkID, state);
 
@@ -446,6 +449,7 @@ export class Blink {
       state.inFlight = true;
       this.readLocalStorageManifest(network)
         .then(clipCount => {
+          state.baselined = true;
           state.backoff.reset();
           state.nextPollAt = Date.now() + LOCAL_STORAGE_POLL * 1000;
           if (!state.successLogged) {
@@ -530,6 +534,16 @@ export class Blink {
       networkID
     );
 
+    // First successful read is a baseline: its clips predate the plugin and
+    // were already notified in a previous run, so they carry no discovery
+    // stamp and cannot trip the motion window (#56). Suppression is by
+    // manifest membership, not created_at comparisons — manifest timestamps
+    // can't be trusted against our clock (see the debug log below). A clip
+    // recorded during the startup window can still fire via its own
+    // created_at because LOCAL_STORAGE_STARTUP_DELAY >= MOTION_TRIGGER_DECAY
+    // guarantees anything older is already past decay by the first read.
+    const baselined = this.localStorageState.get(networkID)?.baselined ?? false;
+
     for (const clip of clips) {
       const device = nameMap.get(toAlphanumeric(clip.camera_name ?? ''));
       if (!device) {
@@ -547,12 +561,15 @@ export class Blink {
       if (createdAt > existingAt) {
         this.localMedia.set(device.cameraID, {
           entry: clipToMediaEntry(clip, device),
-          discoveredAt: Date.now(),
+          discoveredAt: baselined ? Date.now() : 0,
         });
         // Raw created_at logged so clock-skew/timezone issues are visible in
         // debug logs from the field.
         this.log.debug(
-          `${device.name}: new local storage clip (created_at=${clip.created_at})`
+          baselined
+            ? `${device.name}: new local storage clip (created_at=${clip.created_at})`
+            : `${device.name}: baseline local storage clip, no motion ` +
+                `(created_at=${clip.created_at})`
         );
       }
     }
