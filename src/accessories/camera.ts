@@ -13,7 +13,10 @@ import {
 import type { BlinkCamera } from '../devices/camera.js';
 import type { BlinkOptions } from '../lib/config.js';
 import { routineInfo } from '../lib/logInfo.js';
-import { BlinkCameraDelegate } from './cameraDelegate.js';
+import {
+  BlinkCameraDelegate,
+  CONFIGURED_ACCESSORIES,
+} from './cameraDelegate.js';
 
 export class CameraAccessory {
   private readonly accessory: PlatformAccessory;
@@ -24,6 +27,7 @@ export class CameraAccessory {
   private readonly Service: typeof Service;
   private readonly hap: HAP;
   private _controller?: CameraController;
+  private _delegate?: BlinkCameraDelegate;
 
   constructor(
     camera: BlinkCamera,
@@ -95,6 +99,15 @@ export class CameraAccessory {
     return this.accessory;
   }
 
+  /**
+   * Release resources held on behalf of this accessory. Called when the
+   * device is removed from the account, so in-flight streams and their
+   * proxy servers do not outlive the accessory that owned them.
+   */
+  async shutdown(): Promise<void> {
+    await this._delegate?.shutdown();
+  }
+
   private setupAccessoryInfo(): void {
     const infoService = this.accessory.getService(
       this.Service.AccessoryInformation
@@ -128,6 +141,18 @@ export class CameraAccessory {
   }
 
   private setupCameraController(): void {
+    // A PlatformAccessory can only carry one camera controller. The platform
+    // reuses accessory wrappers so this normally runs once per device, but
+    // guard here too: a rebuild against a recycled accessory (config toggled,
+    // device disappearing and returning) would otherwise attach a second
+    // controller to an accessory that already has one.
+    if (CONFIGURED_ACCESSORIES.has(this.accessory)) {
+      this.log.debug(
+        `${this.camera.name}: camera controller already configured, skipping`
+      );
+      return;
+    }
+
     const delegate = new BlinkCameraDelegate(
       this.camera,
       this.log,
@@ -180,8 +205,10 @@ export class CameraAccessory {
     };
 
     this._controller = new this.hap.CameraController(controllerOptions);
+    this._delegate = delegate;
     delegate.controller = this._controller;
     this.accessory.configureController(this._controller);
+    CONFIGURED_ACCESSORIES.add(this.accessory);
 
     const cameraMode = this.accessory.getService(
       this.Service.CameraOperatingMode

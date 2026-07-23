@@ -51,6 +51,16 @@ interface ProxySession {
   isRtsp?: boolean;
 }
 
+/**
+ * PlatformAccessory objects that already carry a camera controller.
+ *
+ * Deliberately process-local and NOT stored on `accessory.context`: context is
+ * serialized to Homebridge's accessory cache and restored on boot, so a
+ * persisted flag would make every camera skip controller setup after the first
+ * restart, leaving it with no live view or snapshots.
+ */
+export const CONFIGURED_ACCESSORIES = new WeakSet<object>();
+
 export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly blinkCamera: BlinkCamera;
   private readonly log: Logger;
@@ -69,6 +79,10 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private outputErrorSessions = new Set<string>();
   private audioDisabledSessions = new Set<string>();
   private lastForcedRefresh = 0;
+  // Set by shutdown(). Async stream paths check it after every suspension
+  // point so a retry parked in a sleep cannot resurrect ffmpeg children or
+  // proxy servers on an accessory that has already been torn down.
+  private destroyed = false;
 
   private static readonly RETRYABLE_FFMPEG_CODES = new Set([251, 187]);
   private static readonly MAX_STREAM_RETRIES = 2;
@@ -768,6 +782,49 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     }
   }
 
+  /**
+   * Release everything this delegate owns. Called when the accessory is
+   * removed from HomeKit: without it, ffmpeg children keep running and proxy
+   * servers keep holding their ports with nothing left to own them.
+   */
+  async shutdown(): Promise<void> {
+    this.destroyed = true;
+
+    for (const [sessionID, timeout] of this.streamTimeouts) {
+      clearTimeout(timeout);
+      this.streamTimeouts.delete(sessionID);
+    }
+
+    for (const [sessionID, session] of this.proxySessions) {
+      try {
+        await session.proxyServer?.stop();
+      } catch (e) {
+        this.log.debug(
+          `${this.blinkCamera.name} - Error stopping proxy on shutdown: ${e}`
+        );
+      }
+      this.proxySessions.delete(sessionID);
+    }
+
+    for (const [sessionID, ffmpegProcess] of this.ongoingSessions) {
+      try {
+        ffmpegProcess?.kill('SIGKILL');
+      } catch (e) {
+        this.log.debug(
+          `${this.blinkCamera.name} - Error killing stream on shutdown: ${e}`
+        );
+      }
+      this.ongoingSessions.delete(sessionID);
+    }
+
+    this.pendingSessions.clear();
+    this.streamStartTimes.clear();
+    this.streamRetries.clear();
+    this.sessionInfoCache.clear();
+    this.outputErrorSessions.clear();
+    this.audioDisabledSessions.clear();
+  }
+
   private async retryImmiStream(
     sessionID: string,
     video: VideoInfo,
@@ -787,6 +844,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     this.ongoingSessions.delete(sessionID);
 
     await sleep(BlinkCameraDelegate.RETRY_DELAY_MS);
+    if (this.destroyed) {
+      return;
+    }
 
     // Request fresh LiveView URL
     let liveViewURL: string | undefined;
@@ -796,6 +856,12 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       this.log.warn(
         `${this.blinkCamera.name} - Retry: LiveView request failed: ${err instanceof Error ? err.message : String(err)}`
       );
+    }
+
+    // The liveview request is another suspension point; the accessory may
+    // have been torn down while it was in flight.
+    if (this.destroyed) {
+      return;
     }
 
     if (!liveViewURL?.startsWith('immis')) {

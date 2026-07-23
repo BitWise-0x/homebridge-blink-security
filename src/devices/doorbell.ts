@@ -10,8 +10,8 @@ export class BlinkDoorbell extends BlinkCamera {
   private _onPress?: DoorbellPressCallback;
   private readonly _initTime = Date.now();
 
-  constructor(data: HomescreenCamera, blink: Blink) {
-    super(data, blink);
+  constructor(data: HomescreenCamera, blink: Blink, isOwlDevice = false) {
+    super(data, blink, isOwlDevice);
   }
 
   override get canonicalID(): string {
@@ -20,10 +20,6 @@ export class BlinkDoorbell extends BlinkCamera {
 
   get isDoorbell(): boolean {
     return true;
-  }
-
-  override get isCameraMini(): boolean {
-    return false;
   }
 
   get lastDoorbellPress(): number {
@@ -46,25 +42,17 @@ export class BlinkDoorbell extends BlinkCamera {
   }
 
   async checkForPress(): Promise<boolean> {
-    const lastMotion = await this.blink
-      .getCameraLastMotion(this.networkID, this.cameraID)
+    // Ask for the newest press specifically rather than the newest media of
+    // any kind: a local-storage clip of the same doorbell event is often
+    // stamped a moment later, and would otherwise mask the press entirely.
+    const lastPress = await this.blink
+      .getCameraLastPress(this.networkID, this.cameraID)
       .catch(() => undefined);
-    if (!lastMotion) {
+    if (!lastPress) {
       return false;
     }
 
-    // If the API provides a source field, only treat "button"/"button_press" as a press.
-    // The Blink API has been observed returning "button_press" for doorbell presses
-    // (rather than the previously assumed "button"), so both values are accepted.
-    // Other sources (e.g. "pir", liveview) are not doorbell presses.
-    if (
-      lastMotion.source &&
-      !['button', 'button_press'].includes(lastMotion.source)
-    ) {
-      return false;
-    }
-
-    const eventTime = Date.parse(lastMotion.created_at) || 0;
+    const eventTime = Date.parse(lastPress.created_at) || 0;
     if (eventTime <= 0) {
       return false;
     }

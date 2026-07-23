@@ -15,7 +15,13 @@ import {
 import { BlinkAuthClient, BlinkAuth2FARequiredError } from './lib/auth.js';
 import { routineInfo } from './lib/logInfo.js';
 import { ExponentialBackoff } from './lib/utils.js';
-import { Blink } from './devices/index.js';
+import {
+  Blink,
+  type BlinkCamera,
+  type BlinkDoorbell,
+  type BlinkNetwork,
+  type BlinkSiren,
+} from './devices/index.js';
 import { SecuritySystemAccessory } from './accessories/securitySystem.js';
 import { CameraAccessory } from './accessories/camera.js';
 import { DoorbellAccessory } from './accessories/doorbell.js';
@@ -35,6 +41,14 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private securityAccessories: SecuritySystemAccessory[] = [];
   private cameraAccessories: CameraAccessory[] = [];
   private doorbellAccessories: DoorbellAccessory[] = [];
+  // Retained purely so a later sync reuses the wrapper instead of rebuilding
+  // it; SirenAccessory is a stateless switch with no updateState to push.
+  private sirenAccessories: SirenAccessory[] = [];
+  // UUIDs handed to registerPlatformAccessories, so a later sync never
+  // registers the same accessory twice.
+  private readonly registeredUUIDs = new Set<string>();
+  // Device set seen by the last sync, to skip needless reconciles.
+  private lastDeviceFingerprint = '';
 
   constructor(log: Logger, config: PlatformConfig, api: API) {
     this.log = log;
@@ -65,11 +79,24 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
     }
+    // Streams outlive the process otherwise: ffmpeg children are detached and
+    // proxy servers keep holding their ports.
+    for (const accessory of [
+      ...this.cameraAccessories,
+      ...this.doorbellAccessories,
+    ]) {
+      accessory.shutdown().catch(() => {
+        /* best effort on the way out */
+      });
+    }
     this.authClient?.destroy();
   }
 
   configureAccessory(accessory: PlatformAccessory): void {
     this.cachedAccessories.push(accessory);
+    // Restored from Homebridge's cache means already registered; re-adding it
+    // would duplicate the accessory in HomeKit.
+    this.registeredUUIDs.add(accessory.UUID);
   }
 
   private async init(): Promise<void> {
@@ -126,106 +153,8 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         );
       }
 
-      const accessories: PlatformAccessory[] = [];
-
-      for (const network of this.blink.networks.values()) {
-        if (this.config.noAlarm && this.config.noManualArmSwitch) {
-          continue;
-        }
-
-        const securityAccessory = new SecuritySystemAccessory(
-          network,
-          this.api,
-          this.log,
-          this.config,
-          this.cachedAccessories
-        );
-        this.securityAccessories.push(securityAccessory);
-        accessories.push(securityAccessory.platformAccessory);
-      }
-
-      for (const camera of this.blink.cameras.values()) {
-        if (this.config.noCameras) {
-          continue;
-        }
-
-        const cameraAccessory = new CameraAccessory(
-          camera,
-          this.api,
-          this.log,
-          this.config,
-          this.cachedAccessories
-        );
-        this.cameraAccessories.push(cameraAccessory);
-        accessories.push(cameraAccessory.platformAccessory);
-      }
-
-      for (const doorbell of this.blink.doorbells.values()) {
-        if (this.config.noDoorbells) {
-          continue;
-        }
-
-        const doorbellAccessory = new DoorbellAccessory(
-          doorbell,
-          this.api,
-          this.log,
-          this.config,
-          this.cachedAccessories
-        );
-        this.doorbellAccessories.push(doorbellAccessory);
-        accessories.push(doorbellAccessory.platformAccessory);
-      }
-
-      for (const siren of this.blink.sirens.values()) {
-        const sirenAccessory = new SirenAccessory(
-          siren,
-          this.api,
-          this.log,
-          this.config,
-          this.cachedAccessories
-        );
-        accessories.push(sirenAccessory.platformAccessory);
-      }
-
-      const activeUUIDs = new Set(accessories.map(a => a.UUID));
-      const staleAccessories = this.cachedAccessories.filter(
-        a => !activeUUIDs.has(a.UUID)
-      );
-
-      if (staleAccessories.length > 0) {
-        this.api.unregisterPlatformAccessories(
-          PLUGIN_NAME,
-          PLATFORM_NAME,
-          staleAccessories
-        );
-        this.log.info(
-          `Unregistering ${staleAccessories.length} stale accessories: ${staleAccessories.map(a => a.displayName).join(', ')}`
-        );
-      }
-
-      const cachedUUIDs = new Set(this.cachedAccessories.map(a => a.UUID));
-      const newAccessories = accessories.filter(a => !cachedUUIDs.has(a.UUID));
-
-      if (newAccessories.length > 0) {
-        this.log.info(
-          `Registering ${newAccessories.length} new accessories: ${newAccessories.map(a => a.displayName).join(', ')}`
-        );
-        this.api.registerPlatformAccessories(
-          PLUGIN_NAME,
-          PLATFORM_NAME,
-          newAccessories
-        );
-      }
-
-      routineInfo(
-        this.log,
-        this.config,
-        `Blink ready: ${accessories.length} total accessories ` +
-          `(${newAccessories.length} new, ` +
-          `${staleAccessories.length} stale removed, ` +
-          `${this.cachedAccessories.length} cached)`
-      );
-
+      this.lastDeviceFingerprint = this.deviceFingerprint();
+      this.syncAccessories();
       this.schedulePoll();
     } catch (err) {
       this.log.error(String(err));
@@ -248,6 +177,222 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     }
   }
 
+  /**
+   * Reconcile HomeKit accessories against the current Blink device set.
+   *
+   * Runs at init and again whenever polling finds the device set changed, so
+   * devices added or removed in the Blink app are picked up without a
+   * restart. Accessories are built ONCE per device and reused on later
+   * passes: re-constructing one would attach a second camera controller to
+   * the same accessory.
+   */
+  private syncAccessories(): void {
+    if (!this.blink) {
+      return;
+    }
+
+    const active: PlatformAccessory[] = [];
+    const registrations: PlatformAccessory[] = [];
+
+    /**
+     * Return the existing accessory wrapper for a device, or build and
+     * register a new one.
+     */
+    const resolve = <T extends { platformAccessory: PlatformAccessory }>(
+      existing: T | undefined,
+      build: () => T
+    ): T => {
+      const wrapper = existing ?? build();
+      const accessory = wrapper.platformAccessory;
+      active.push(accessory);
+      if (!existing && !this.registeredUUIDs.has(accessory.UUID)) {
+        this.registeredUUIDs.add(accessory.UUID);
+        registrations.push(accessory);
+      }
+      return wrapper;
+    };
+
+    const securityAccessories: SecuritySystemAccessory[] = [];
+    if (!(this.config.noAlarm && this.config.noManualArmSwitch)) {
+      for (const network of this.blink.networks.values()) {
+        const existing = this.securityAccessories.find(
+          a => a.platformAccessory.context.canonicalID === network.canonicalID
+        );
+        securityAccessories.push(
+          resolve(existing, () => this.buildSecurityAccessory(network))
+        );
+      }
+    }
+
+    const cameraAccessories: CameraAccessory[] = [];
+    if (!this.config.noCameras) {
+      for (const camera of this.blink.cameras.values()) {
+        const existing = this.cameraAccessories.find(
+          a => a.platformAccessory.context.canonicalID === camera.canonicalID
+        );
+        cameraAccessories.push(
+          resolve(existing, () => this.buildCameraAccessory(camera))
+        );
+      }
+    }
+
+    const doorbellAccessories: DoorbellAccessory[] = [];
+    if (!this.config.noDoorbells) {
+      for (const doorbell of this.blink.doorbells.values()) {
+        const existing = this.doorbellAccessories.find(
+          a => a.platformAccessory.context.canonicalID === doorbell.canonicalID
+        );
+        doorbellAccessories.push(
+          resolve(existing, () => this.buildDoorbellAccessory(doorbell))
+        );
+      }
+    }
+
+    const sirenAccessories: SirenAccessory[] = [];
+    for (const siren of this.blink.sirens.values()) {
+      const existing = this.sirenAccessories.find(
+        a => a.platformAccessory.context.canonicalID === siren.canonicalID
+      );
+      sirenAccessories.push(
+        resolve(existing, () => this.buildSirenAccessory(siren))
+      );
+    }
+
+    // Capture the wrappers being dropped before the arrays are replaced:
+    // they own ffmpeg children and proxy servers that must be released.
+    const retained = new Set(active);
+    const dropped = [
+      ...this.cameraAccessories,
+      ...this.doorbellAccessories,
+    ].filter(a => !retained.has(a.platformAccessory));
+
+    this.securityAccessories = securityAccessories;
+    this.cameraAccessories = cameraAccessories;
+    this.doorbellAccessories = doorbellAccessories;
+    this.sirenAccessories = sirenAccessories;
+
+    for (const wrapper of dropped) {
+      wrapper
+        .shutdown()
+        .catch(err => this.log.debug(`Accessory teardown failed: ${err}`));
+    }
+
+    // Anything previously registered (this run or restored from cache) that
+    // no longer maps to a device is stale.
+    const activeUUIDs = new Set(active.map(a => a.UUID));
+    let stale = this.cachedAccessories.filter(a => !activeUUIDs.has(a.UUID));
+
+    // Never unregister everything. An account that reports zero devices is
+    // far more likely to be a transient API or auth problem than a user
+    // deleting every camera, and unregistering takes their room assignments,
+    // names, scenes and automations with it. The device layer applies the
+    // same floor per device kind (see pruneRemovedDevices); this is the
+    // backstop for the accessory layer as a whole.
+    if (active.length === 0 && stale.length > 0) {
+      this.log.warn(
+        `Blink reported no devices; keeping ${stale.length} existing ` +
+          'accessories rather than removing them'
+      );
+      stale = [];
+    }
+
+    if (stale.length > 0) {
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale);
+      this.log.info(
+        `Unregistering ${stale.length} stale accessories: ` +
+          stale.map(a => a.displayName).join(', ')
+      );
+      for (const accessory of stale) {
+        this.registeredUUIDs.delete(accessory.UUID);
+        const index = this.cachedAccessories.indexOf(accessory);
+        if (index >= 0) {
+          this.cachedAccessories.splice(index, 1);
+        }
+      }
+    }
+
+    if (registrations.length > 0) {
+      this.log.info(
+        `Registering ${registrations.length} new accessories: ` +
+          registrations.map(a => a.displayName).join(', ')
+      );
+      this.api.registerPlatformAccessories(
+        PLUGIN_NAME,
+        PLATFORM_NAME,
+        registrations
+      );
+      // Keep the cache authoritative so a later pass sees these as known.
+      this.cachedAccessories.push(...registrations);
+    }
+
+    routineInfo(
+      this.log,
+      this.config,
+      `Blink ready: ${active.length} total accessories ` +
+        `(${registrations.length} new, ${stale.length} stale removed, ` +
+        `${this.cachedAccessories.length} cached)`
+    );
+  }
+
+  /* Accessory construction is isolated behind these hooks so the reconcile
+   * logic can be exercised without a full HAP implementation. */
+  protected buildSecurityAccessory(
+    network: BlinkNetwork
+  ): SecuritySystemAccessory {
+    return new SecuritySystemAccessory(
+      network,
+      this.api,
+      this.log,
+      this.config,
+      this.cachedAccessories
+    );
+  }
+
+  protected buildCameraAccessory(camera: BlinkCamera): CameraAccessory {
+    return new CameraAccessory(
+      camera,
+      this.api,
+      this.log,
+      this.config,
+      this.cachedAccessories
+    );
+  }
+
+  protected buildDoorbellAccessory(doorbell: BlinkDoorbell): DoorbellAccessory {
+    return new DoorbellAccessory(
+      doorbell,
+      this.api,
+      this.log,
+      this.config,
+      this.cachedAccessories
+    );
+  }
+
+  protected buildSirenAccessory(siren: BlinkSiren): SirenAccessory {
+    return new SirenAccessory(
+      siren,
+      this.api,
+      this.log,
+      this.config,
+      this.cachedAccessories
+    );
+  }
+
+  /** Canonical IDs of every device currently exposed, for change detection. */
+  private deviceFingerprint(): string {
+    if (!this.blink) {
+      return '';
+    }
+    return [
+      ...[...this.blink.networks.values()].map(n => n.canonicalID),
+      ...[...this.blink.cameras.values()].map(c => c.canonicalID),
+      ...[...this.blink.doorbells.values()].map(d => d.canonicalID),
+      ...[...this.blink.sirens.values()].map(s => s.canonicalID),
+    ]
+      .sort()
+      .join('|');
+  }
+
   private schedulePoll(): void {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
@@ -261,6 +406,13 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     try {
       await this.blink?.refreshData();
       this.pollBackoff.reset();
+      // Devices added or removed in the Blink app reach HomeKit here; the
+      // fingerprint keeps the common no-change case free.
+      const fingerprint = this.deviceFingerprint();
+      if (fingerprint !== this.lastDeviceFingerprint) {
+        this.lastDeviceFingerprint = fingerprint;
+        this.syncAccessories();
+      }
       this.pushUpdates();
     } catch (err) {
       this.log.error(String(err));

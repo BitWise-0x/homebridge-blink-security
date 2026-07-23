@@ -13,7 +13,10 @@ import {
 import type { BlinkDoorbell } from '../devices/doorbell.js';
 import type { BlinkOptions } from '../lib/config.js';
 import { routineInfo } from '../lib/logInfo.js';
-import { BlinkCameraDelegate } from './cameraDelegate.js';
+import {
+  BlinkCameraDelegate,
+  CONFIGURED_ACCESSORIES,
+} from './cameraDelegate.js';
 
 export class DoorbellAccessory {
   private readonly accessory: PlatformAccessory;
@@ -24,6 +27,7 @@ export class DoorbellAccessory {
   private readonly Service: typeof Service;
   private readonly hap: HAP;
   private _controller?: CameraController;
+  private _delegate?: BlinkCameraDelegate;
   private doorbellService?: Service;
 
   constructor(
@@ -86,6 +90,15 @@ export class DoorbellAccessory {
     return this.accessory;
   }
 
+  /**
+   * Release resources held on behalf of this accessory. Called when the
+   * device is removed from the account, so in-flight streams and their
+   * proxy servers do not outlive the accessory that owned them.
+   */
+  async shutdown(): Promise<void> {
+    await this._delegate?.shutdown();
+  }
+
   private setupAccessoryInfo(): void {
     const infoService = this.accessory.getService(
       this.Service.AccessoryInformation
@@ -119,6 +132,15 @@ export class DoorbellAccessory {
   }
 
   private setupCameraController(): void {
+    // See CameraAccessory: one camera controller per PlatformAccessory. Guard
+    // against a rebuild attaching a second one to a recycled accessory.
+    if (CONFIGURED_ACCESSORIES.has(this.accessory)) {
+      this.log.debug(
+        `${this.doorbell.name}: camera controller already configured, skipping`
+      );
+      return;
+    }
+
     const delegate = new BlinkCameraDelegate(
       this.doorbell,
       this.log,
@@ -171,8 +193,10 @@ export class DoorbellAccessory {
     };
 
     this._controller = new this.hap.CameraController(controllerOptions);
+    this._delegate = delegate;
     delegate.controller = this._controller;
     this.accessory.configureController(this._controller);
+    CONFIGURED_ACCESSORIES.add(this.accessory);
   }
 
   private applyConfiguredName(service: Service, name: string): void {

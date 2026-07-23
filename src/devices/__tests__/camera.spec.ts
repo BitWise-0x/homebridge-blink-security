@@ -23,45 +23,36 @@ function makeCamera(type: string, isOwlDevice = false): BlinkCamera {
 }
 
 describe('BlinkCamera device-type classification', () => {
-  // Regression for issue #40: the Wired Floodlight reports type "superior"
-  // and must route motion enable/disable through the owl config endpoint
-  // rather than the legacy /network/.../camera/.../enable path (which 404s).
-  it('treats a "superior" floodlight as a mini', () => {
-    expect(makeCamera('superior').isCameraMini).toBe(true);
+  // Regressions for issues #40 (superior/Wired Floodlight) and #51
+  // (chickadee/Mini 2K+): owl-family devices must route motion enable through
+  // the owl config endpoint rather than the legacy camera path, which 404s.
+  // Membership in the homescreen `owls` array is the ONLY signal for that
+  // routing — every one of these models is delivered in that array.
+  it('treats owl-array members as minis regardless of codename', () => {
+    expect(makeCamera('superior', true).isCameraMini).toBe(true);
+    expect(makeCamera('owl', true).isCameraMini).toBe(true);
+    expect(makeCamera('hawk', true).isCameraMini).toBe(true);
+    expect(makeCamera('chickadee', true).isCameraMini).toBe(true);
   });
 
-  it('identifies a "superior" floodlight as a floodlight', () => {
-    expect(makeCamera('superior').isFloodlight).toBe(true);
-  });
-
-  it('treats owl and hawk as minis', () => {
-    expect(makeCamera('owl').isCameraMini).toBe(true);
-    expect(makeCamera('hawk').isCameraMini).toBe(true);
-  });
-
-  // Regression for issue #51: the Blink Mini 2K+ reports type "chickadee"
-  // and must be routed through the owl config endpoint, same as #40.
-  it('treats a "chickadee" Mini 2K+ as a mini', () => {
-    expect(makeCamera('chickadee').isCameraMini).toBe(true);
-  });
-
-  it('does not treat a regular camera as a mini', () => {
-    const camera = makeCamera('camera');
-    expect(camera.isCameraMini).toBe(false);
-    expect(camera.isFloodlight).toBe(false);
-  });
-
-  // Membership in the homescreen `owls` array is the authoritative signal for
-  // owl-endpoint routing (issues #40, #51 are recurrences of relying on the
-  // codename allow-list alone). A device in that array must route through the
-  // owl endpoints even when its codename is brand new and unrecognized.
+  // A brand-new hardware revision reports an unrecognized bird codename. It
+  // must still route correctly on array membership alone — this is what
+  // stopped #40/#51 from recurring for every future model.
   it('treats any owl-array member as a mini, even with an unknown codename', () => {
     expect(makeCamera('somefuturebird', true).isCameraMini).toBe(true);
   });
 
-  it('still recognizes known codenames when not flagged as an owl device', () => {
-    expect(makeCamera('owl', false).isCameraMini).toBe(true);
-    expect(makeCamera('chickadee', false).isCameraMini).toBe(true);
+  it('does not treat a regular camera as a mini', () => {
+    expect(makeCamera('camera').isCameraMini).toBe(false);
+  });
+
+  // The inverse of the #40/#51 lesson: a hardcoded codename must never
+  // override the authoritative array. If Blink ever ships a known owl
+  // codename in the plain `cameras` array, routing it to owl endpoints
+  // would 404 exactly the way the original bug did.
+  it('does not force a known codename onto owl endpoints outside the owls array', () => {
+    expect(makeCamera('superior', false).isCameraMini).toBe(false);
+    expect(makeCamera('chickadee', false).isCameraMini).toBe(false);
   });
 
   it('does not treat an unknown codename as a mini unless it is an owl-array member', () => {
@@ -77,7 +68,8 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
 
   function makeArmedCamera(
     localMediaTimestamp: number,
-    clipCreatedAt = localMediaTimestamp
+    clipCreatedAt = localMediaTimestamp,
+    armedAt = Date.now() - 60 * 60 * 1000
   ): {
     camera: BlinkCamera;
     getCameraLastMotion: ReturnType<typeof vi.fn>;
@@ -98,7 +90,7 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
     const network = {
       armed: true,
       updatedAt: Date.parse(staleIso),
-      armedAt: Date.now() - 60 * 60 * 1000,
+      armedAt,
     };
     const getCameraLastMotion = vi.fn().mockResolvedValue({
       created_at: new Date(clipCreatedAt).toISOString(),
@@ -135,6 +127,29 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
     const { camera } = makeArmedCamera(
       Date.now() - 5 * 1000, // discovered 5s ago
       Date.now() - 5 * 60 * 1000 // recording started 5 minutes ago
+    );
+    await expect(camera.getMotionDetected()).resolves.toBe(true);
+  });
+
+  // The armed gate must compare the EVENT time to the arm instant. Gating on
+  // the current time is always satisfied once armed and suppresses nothing.
+  it('does not fire for an event recorded well before the network was armed', async () => {
+    // Discovered just now (so the decay window is open) but recorded long
+    // before arming, and beyond the ARMED_DELAY grace period.
+    const { camera } = makeArmedCamera(
+      Date.now() - 5 * 1000,
+      Date.now() - 5 * 1000,
+      Date.now() + 10 * 60 * 1000
+    );
+    await expect(camera.getMotionDetected()).resolves.toBe(false);
+  });
+
+  it('fires for an event just inside the pre-arm grace window', async () => {
+    const armedAt = Date.now();
+    const { camera } = makeArmedCamera(
+      armedAt - 10 * 1000,
+      armedAt - 10 * 1000,
+      armedAt
     );
     await expect(camera.getMotionDetected()).resolves.toBe(true);
   });

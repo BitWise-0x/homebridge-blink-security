@@ -49,6 +49,13 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 
 </div>
 
+> **Newer models work automatically.** Model types are listed for reference
+> only — the plugin routes each device by how the Blink account reports it,
+> not by its model string. Hardware released after this table (for example
+> the 2K+ outdoor cameras and doorbells) is supported without a plugin
+> update. If a device does not appear in HomeKit at all, please open an
+> issue with your startup log.
+
 <br>
 
 ## Architecture

@@ -8,16 +8,32 @@ import type { ExponentialBackoff } from '../lib/utils.js';
 // motion are indistinguishable on the local storage path.
 export const LOCAL_STORAGE_SOURCE = 'local_storage';
 
+// Media sources that represent a doorbell button press. Blink has been
+// observed using both spellings; anything else (pir, liveview, local
+// storage clips) is motion, not a press.
+export const DOORBELL_PRESS_SOURCES = ['button', 'button_press'];
+
+// A clip dated more than this far ahead of local time is treated as clock
+// skew on the sync module rather than a real recording. Storing it would
+// win the newest-clip comparison forever and silence the camera until wall
+// clock caught up.
+export const MAX_CLIP_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
 export interface LocalStoragePollState {
   nextPollAt: number;
   backoff: ExponentialBackoff;
   active: boolean;
   inFlight: boolean;
   successLogged: boolean;
-  // False until the first successful manifest read. Clips present on that
-  // read predate the plugin (or slipped in during the startup window) and
-  // must not replay as motion events (#56).
+  // False until the next manifest read establishes a baseline. Set on the
+  // first read and re-armed whenever the fallback stands down, because clips
+  // recorded while it was idle are history by the time it resumes and must
+  // not replay as motion (#56).
   baselined: boolean;
+  // Devices that had been baselined on this network. A device discovered
+  // later (doorbell fallback discovery can lag several cycles) needs its own
+  // first-sighting baseline rather than inheriting the network's.
+  baselinedDevices: Set<number>;
 }
 
 /**

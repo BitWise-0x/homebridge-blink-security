@@ -12,7 +12,7 @@ import type { BlinkAuthClient } from '../lib/auth.js';
 import { DEFAULT_OPTIONS, type BlinkOptions } from '../lib/config.js';
 import { routineInfo } from '../lib/logInfo.js';
 import { BlinkNetwork, type NetworkData } from './network.js';
-import { BlinkCamera, OWL_CODENAMES } from './camera.js';
+import { BlinkCamera, KNOWN_OWL_CODENAMES } from './camera.js';
 import { BlinkDoorbell } from './doorbell.js';
 import { BlinkSiren } from './siren.js';
 import {
@@ -20,6 +20,8 @@ import {
   clipToMediaEntry,
   isLocalStorageActive,
   toAlphanumeric,
+  DOORBELL_PRESS_SOURCES,
+  MAX_CLIP_FUTURE_SKEW_MS,
   type LocalStoragePollState,
 } from './localStorage.js';
 import { ExponentialBackoff } from '../lib/utils.js';
@@ -67,6 +69,13 @@ export class Blink {
     { entry: MediaEntry; discoveredAt: number }
   >();
   private readonly localStorageState = new Map<number, LocalStoragePollState>();
+  // Homescreen collections already reported as unrecognized, so the warning
+  // fires once per group rather than on every poll.
+  private readonly unknownDeviceGroups = new Set<string>();
+  // Doorbells the homescreen has actually listed. Doorbells found through the
+  // media fallback are absent from it by nature, so their absence must never
+  // be read as a removal.
+  private readonly homescreenDoorbells = new Set<number>();
 
   constructor(
     authClient: BlinkAuthClient,
@@ -101,17 +110,136 @@ export class Blink {
     return new BlinkCamera(data, this, isOwlDevice);
   }
 
-  protected createDoorbell(data: HomescreenCamera): BlinkDoorbell {
-    return new BlinkDoorbell(data, this);
+  protected createDoorbell(
+    data: HomescreenCamera,
+    isOwlDevice = false
+  ): BlinkDoorbell {
+    return new BlinkDoorbell(data, this, isOwlDevice);
   }
 
   protected createSiren(data: HomescreenSiren): BlinkSiren {
     return new BlinkSiren(data, this);
   }
 
+  /**
+   * Warn once per unrecognized homescreen collection that looks like it
+   * holds devices. Blink introduced `owls` as a sibling of `cameras` for the
+   * Mini family; if a future hardware family arrives the same way, its
+   * devices would otherwise be dropped silently with no accessory and no
+   * log line to explain why.
+   */
+  private warnUnknownHomescreenDevices(homescreen: unknown): void {
+    const known = new Set([
+      'cameras',
+      'owls',
+      'doorbells',
+      'doorbell_buttons',
+      'networks',
+      'sync_modules',
+      'sirens',
+    ]);
+    for (const [key, value] of Object.entries(
+      (homescreen ?? {}) as Record<string, unknown>
+    )) {
+      if (known.has(key) || this.unknownDeviceGroups.has(key)) {
+        continue;
+      }
+      // Only collections whose entries carry a device shape are worth
+      // reporting; account metadata and scalar fields are not.
+      // Some entry carrying an id is enough: a new family may name its keys
+      // differently (camera_id, device_id) or mix shapes, and demanding
+      // every entry expose both id and network_id would silently skip it.
+      const looksLikeDevices =
+        Array.isArray(value) &&
+        value.length > 0 &&
+        value.some(
+          entry =>
+            typeof entry === 'object' &&
+            entry !== null &&
+            ['id', 'camera_id', 'device_id'].some(k => k in entry)
+        );
+      if (!looksLikeDevices) {
+        continue;
+      }
+      this.unknownDeviceGroups.add(key);
+      this.log.warn(
+        `Blink returned ${(value as unknown[]).length} device(s) in an ` +
+          `unrecognized "${key}" group; they are not exposed to HomeKit. ` +
+          'Please report this so support can be added: ' +
+          'https://github.com/BitWise-0x/homebridge-blink-security/issues'
+      );
+    }
+  }
+
+  /** Announce a device that appeared after startup. */
+  private logNewDevice(kind: string, name: string): void {
+    this.log.info(`Blink discovered a new ${kind} "${name}"`);
+  }
+
+  /**
+   * Drop devices that are gone from the account so their HomeKit accessories
+   * can be removed and they stop being polled.
+   *
+   * Losing every device at once is treated as an API or auth problem rather
+   * than a real mass deletion: dropping them would tear down the user's
+   * HomeKit configuration, which cannot be recovered by a later poll.
+   */
+  private pruneRemovedDevices(
+    networks: { id: number }[],
+    cameras: HomescreenCamera[],
+    doorbells: HomescreenCamera[],
+    sirens: HomescreenSiren[]
+  ): void {
+    /**
+     * Remove tracked devices of one kind that the account no longer lists.
+     *
+     * The empty check is per kind, not per total: a response that returns one
+     * siren but drops the whole `cameras` array is a partial fault, and a
+     * combined count would sail straight past it and delete every camera.
+     */
+    const drop = <T extends { data: { name?: string } }>(
+      tracked: Map<number, T>,
+      presentIDs: Set<number>,
+      kind: string,
+      eligible: (id: number) => boolean = () => true
+    ) => {
+      const candidates = [...tracked.keys()].filter(eligible);
+      if (presentIDs.size === 0 && candidates.length > 0) {
+        this.log.warn(
+          `Blink reported no ${kind}s; keeping the ${candidates.length} ` +
+            'already known rather than removing them'
+        );
+        return;
+      }
+      for (const id of candidates) {
+        if (!presentIDs.has(id)) {
+          const device = tracked.get(id)!;
+          tracked.delete(id);
+          this.localMedia.delete(id);
+          this.log.info(
+            `Blink ${kind} "${device.data.name ?? id}" is no longer on the ` +
+              'account and was removed'
+          );
+        }
+      }
+    };
+
+    drop(this.networks, new Set(networks.map(n => n.id)), 'network');
+    drop(this.cameras, new Set(cameras.map(c => c.id)), 'camera');
+    // Doorbells discovered through the media fallback never appear in the
+    // homescreen, so the homescreen is not authoritative for them. Only
+    // consider doorbells it has actually reported at some point.
+    drop(this.doorbells, new Set(doorbells.map(d => d.id)), 'doorbell', id =>
+      this.homescreenDoorbells.has(id)
+    );
+    drop(this.sirens, new Set(sirens.map(s => s.id)), 'siren');
+  }
+
   async refreshData(force = false) {
     const ttl = force ? 0.1 : this.statusPoll;
     const homescreen = await this.api.getAccountHomescreen(ttl);
+
+    this.warnUnknownHomescreenDevices(homescreen);
 
     const owls = homescreen.owls ?? [];
     const owlIds = new Set(owls.map(o => o.id));
@@ -124,6 +252,11 @@ export class Blink {
       ...(homescreen.doorbells ?? []),
       ...(homescreen.doorbell_buttons ?? []),
     ];
+    // Recorded before the media fallback can substitute its own list, so
+    // pruning knows which doorbells the homescreen is authoritative for.
+    for (const doorbell of allDoorbells) {
+      this.homescreenDoorbells.add(doorbell.id);
+    }
 
     // Fallback: discover doorbells from recent media when homescreen has none
     if (allDoorbells.length === 0) {
@@ -132,15 +265,23 @@ export class Blink {
           .getMediaChange(ttl)
           .catch(() => ({ media: [] }));
 
+        // Any media device type that is not a known camera is a doorbell
+        // candidate; the /doorbells/ config probe below decides. Matching
+        // only the known "lotus" codename would miss every future doorbell
+        // revision the same way #40/#51 missed new camera models.
+        const knownCameraIds = new Set([
+          ...allCameras.map(c => c.id),
+          ...this.cameras.keys(),
+        ]);
         const doorbellIds = new Map<
           number,
           { network_id: number; thumbnail: string }
         >();
         for (const entry of mediaRes.media ?? []) {
-          if (
-            entry.device === DOORBELL_DEVICE_TYPE &&
-            !doorbellIds.has(entry.device_id)
-          ) {
+          const isCandidate =
+            entry.device === DOORBELL_DEVICE_TYPE ||
+            !knownCameraIds.has(entry.device_id);
+          if (isCandidate && !doorbellIds.has(entry.device_id)) {
             doorbellIds.set(entry.device_id, {
               network_id: entry.network_id,
               thumbnail: entry.thumbnail,
@@ -257,18 +398,36 @@ export class Blink {
       for (const n of homescreen.networks) {
         if (this.networks.has(n.id)) {
           this.networks.get(n.id)!.data = n as NetworkData;
+        } else {
+          this.networks.set(n.id, this.createNetwork(n as NetworkData));
         }
       }
+      // Devices added to the account while Homebridge is running are tracked
+      // here; the platform reconciles HomeKit accessories on the same poll,
+      // so they appear without a restart.
       for (const c of filteredCameras) {
         if (this.cameras.has(c.id)) {
           this.cameras.get(c.id)!.data = c;
+        } else {
+          this.cameras.set(c.id, this.createCamera(c, owlIds.has(c.id)));
+          this.logNewDevice('camera', c.name);
         }
       }
       for (const d of allDoorbells) {
         if (this.doorbells.has(d.id)) {
           this.doorbells.get(d.id)!.data = d;
+        } else {
+          this.doorbells.set(d.id, this.createDoorbell(d, owlIds.has(d.id)));
+          this.logNewDevice('doorbell', d.name);
         }
       }
+
+      this.pruneRemovedDevices(
+        homescreen.networks,
+        filteredCameras,
+        allDoorbells,
+        allSirens
+      );
       // Refresh fallback-discovered doorbells not present in homescreen
       for (const [id, doorbell] of this.doorbells) {
         if (!doorbellIdSet.has(id)) {
@@ -315,6 +474,8 @@ export class Blink {
       for (const s of allSirens) {
         if (this.sirens.has(s.id)) {
           this.sirens.get(s.id)!.data = s;
+        } else {
+          this.sirens.set(s.id, this.createSiren(s));
         }
       }
     } else {
@@ -328,7 +489,7 @@ export class Blink {
         filteredCameras.map(c => [c.id, this.createCamera(c, owlIds.has(c.id))])
       );
       this.doorbells = new Map(
-        allDoorbells.map(d => [d.id, this.createDoorbell(d)])
+        allDoorbells.map(d => [d.id, this.createDoorbell(d, owlIds.has(d.id))])
       );
       this.sirens = new Map(allSirens.map(s => [s.id, this.createSiren(s)]));
 
@@ -337,13 +498,12 @@ export class Blink {
           `Camera ${camera.cameraID} "${camera.data.name}" type=${camera.model}, isCameraMini=${camera.isCameraMini}`
         );
         // Owl-array members are already routed through the owl endpoints via
-        // `isOwlDevice`, so motion will work regardless of codename. But if the
-        // codename is new (not in OWL_CODENAMES), surface it so it can be
-        // documented — this is how we learned about #40 "superior" and #51
-        // "chickadee". Informational only; nothing is broken.
+        // `isOwlDevice`, so motion works regardless of codename. Surfacing an
+        // unrecognized one is purely so it can be documented — this is how we
+        // learned about #40 "superior" and #51 "chickadee". Nothing is broken.
         if (
           owlIds.has(camera.cameraID) &&
-          !OWL_CODENAMES.includes(camera.model ?? '')
+          !KNOWN_OWL_CODENAMES.includes(camera.model ?? '')
         ) {
           this.log.info(
             `Camera ${camera.cameraID} "${camera.data.name}" reports a new ` +
@@ -418,12 +578,18 @@ export class Blink {
         inFlight: false,
         successLogged: false,
         baselined: false,
+        baselinedDevices: new Set<number>(),
       };
       this.localStorageState.set(network.networkID, state);
 
       if (!eligible) {
         if (state.active) {
           state.active = false;
+          // Clips recorded while the fallback is down are history by the
+          // time it resumes; re-arm the baseline so the resume read
+          // suppresses them instead of replaying them as motion (#56).
+          state.baselined = false;
+          state.baselinedDevices.clear();
           this.log.info(
             `${network.name}: local storage motion fallback deactivated`
           );
@@ -524,25 +690,30 @@ export class Blink {
     if (manifest.manifest_id === undefined && manifest.clips === undefined) {
       throw new Error('manifest fetch returned no data');
     }
+    // An empty manifest still runs the loop body's bookkeeping: the devices
+    // visible on this read are baselined by it even when they have no clips.
     const clips = manifest.clips ?? [];
-    if (clips.length === 0) {
-      return 0;
-    }
 
     const nameMap = buildLocalCameraNameMap(
       [...this.cameras.values(), ...this.doorbells.values()],
       networkID
     );
 
-    // First successful read is a baseline: its clips predate the plugin and
-    // were already notified in a previous run, so they carry no discovery
-    // stamp and cannot trip the motion window (#56). Suppression is by
-    // manifest membership, not created_at comparisons — manifest timestamps
-    // can't be trusted against our clock (see the debug log below). A clip
-    // recorded during the startup window can still fire via its own
-    // created_at because LOCAL_STORAGE_STARTUP_DELAY >= MOTION_TRIGGER_DECAY
-    // guarantees anything older is already past decay by the first read.
-    const baselined = this.localStorageState.get(networkID)?.baselined ?? false;
+    // A read establishes a baseline when the network has not been baselined
+    // yet — at startup, and again whenever the fallback resumes after
+    // standing down. Its clips are already history, so they carry no
+    // discovery stamp and cannot trip the motion window (#56). Suppression
+    // is by manifest membership rather than created_at comparisons, since
+    // manifest timestamps can't be trusted against our clock (see the
+    // skew guard below).
+    const state = this.localStorageState.get(networkID);
+    const networkBaselined = state?.baselined ?? false;
+    const skewCutoff = Date.now() + MAX_CLIP_FUTURE_SKEW_MS;
+    // Every device visible on this read is baselined by it, whether or not
+    // it has a clip in the manifest.
+    const seenDevices = new Set(
+      [...nameMap.values()].map(device => device.cameraID)
+    );
 
     for (const clip of clips) {
       const device = nameMap.get(toAlphanumeric(clip.camera_name ?? ''));
@@ -554,23 +725,49 @@ export class Blink {
       }
 
       const createdAt = Date.parse(clip.created_at) || 0;
+      // A wildly future-dated clip would win every later comparison and
+      // silence this camera until wall clock caught up.
+      if (createdAt > skewCutoff) {
+        this.log.warn(
+          `${device.name}: ignoring local storage clip dated in the future ` +
+            `(created_at=${clip.created_at}); check the sync module clock`
+        );
+        continue;
+      }
+
       const existing = this.localMedia.get(device.cameraID);
       const existingAt = existing
         ? Date.parse(existing.entry.created_at) || 0
         : 0;
+      // A device seen for the first time is baselined on its own terms even
+      // if the network already was: doorbell fallback discovery can register
+      // a device several cycles after the network's first read, and its
+      // backlog is just as historical (#56).
+      const fires =
+        networkBaselined &&
+        (state?.baselinedDevices.has(device.cameraID) ?? false);
       if (createdAt > existingAt) {
         this.localMedia.set(device.cameraID, {
           entry: clipToMediaEntry(clip, device),
-          discoveredAt: baselined ? Date.now() : 0,
+          discoveredAt: fires ? Date.now() : 0,
         });
         // Raw created_at logged so clock-skew/timezone issues are visible in
         // debug logs from the field.
         this.log.debug(
-          baselined
+          fires
             ? `${device.name}: new local storage clip (created_at=${clip.created_at})`
             : `${device.name}: baseline local storage clip, no motion ` +
                 `(created_at=${clip.created_at})`
         );
+      }
+    }
+
+    // Devices present on this read are baselined from here on. Recorded
+    // after the loop so a device only starts firing on the read *after* the
+    // one that first saw it.
+    if (state) {
+      for (const cameraID of seenDevices) {
+        state.baselinedDevices.add(cameraID);
       }
     }
 
@@ -800,19 +997,50 @@ export class Blink {
     }
   }
 
-  async getCameraLastMotion(
+  /**
+   * Cloud media merged with synthesized local-storage entries, newest first,
+   * scoped to a network and optionally a single device.
+   */
+  private async getMergedMedia(
     networkID: number,
     cameraID?: number
-  ): Promise<MediaEntry | undefined> {
+  ): Promise<MediaEntry[]> {
     const res = await this.api
       .getMediaChange(this.motionPoll)
       .catch(() => ({ media: [] }));
     const local = [...this.localMedia.values()].map(rec => rec.entry);
-    const media = [...(res.media || []), ...local]
+    return [...(res.media || []), ...local]
       .filter(m => !networkID || m.network_id === networkID)
       .filter(m => !cameraID || m.device_id === cameraID)
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-    return media[0];
+  }
+
+  async getCameraLastMotion(
+    networkID: number,
+    cameraID?: number
+  ): Promise<MediaEntry | undefined> {
+    return (await this.getMergedMedia(networkID, cameraID))[0];
+  }
+
+  /**
+   * Newest doorbell button press. Presses are selected before picking a
+   * winner because a local-storage clip of the same event is often stamped
+   * a moment later than the cloud press entry; inspecting only the newest
+   * entry would silently swallow the press.
+   *
+   * An entry with no source counts as a press: older Blink firmware omits
+   * the field on doorbell media, and the caller only ever asks about a
+   * doorbell. Synthesized local clips always carry a source, so they are
+   * excluded here rather than relying on that absence.
+   */
+  async getCameraLastPress(
+    networkID: number,
+    cameraID?: number
+  ): Promise<MediaEntry | undefined> {
+    const media = await this.getMergedMedia(networkID, cameraID);
+    return media.find(
+      m => !m.source || DOORBELL_PRESS_SOURCES.includes(m.source)
+    );
   }
 
   async getCameraLastThumbnail(

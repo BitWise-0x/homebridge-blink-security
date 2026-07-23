@@ -3,19 +3,20 @@ import type { BlinkNetwork } from './network.js';
 import { type Blink, ARMED_DELAY, MOTION_TRIGGER_DECAY } from './index.js';
 import { fahrenheitToCelsius } from '../lib/utils.js';
 
-// Known owl-family device codenames. This is a fallback only: the
-// authoritative signal is membership in the homescreen `owls` array (see
-// `isOwlDevice`). Amazon assigns a new bird codename per hardware revision
-// (owl=Mini, hawk=Mini 2, superior=Wired Floodlight, chickadee=Mini 2K+),
-// so routing by codename alone breaks on every new model (issues #40, #51).
-export const OWL_CODENAMES = ['owl', 'hawk', 'superior', 'chickadee'];
+// Owl-family device codenames we have seen in the field (owl=Mini,
+// hawk=Mini 2, superior=Wired Floodlight, chickadee=Mini 2K+). This list is
+// DIAGNOSTIC ONLY and must never influence routing: Amazon assigns a new
+// bird codename per hardware revision, so matching on it breaks for every
+// new model (issues #40, #51). The authoritative signal is membership in
+// the homescreen `owls` array — see `isOwlDevice`.
+export const KNOWN_OWL_CODENAMES = ['owl', 'hawk', 'superior', 'chickadee'];
 
 export class BlinkCamera extends BlinkDevice {
   readonly id: number;
   blink: Blink;
   // True when this device was found in the homescreen `owls` array. This is
   // the reliable discriminator for routing through the owl endpoint family,
-  // regardless of whether its codename is in OWL_CODENAMES.
+  // regardless of what codename it reports.
   readonly isOwlDevice: boolean;
   private cacheThumbnail = new Map<string, Buffer>();
 
@@ -141,15 +142,7 @@ export class BlinkCamera extends BlinkDevice {
   }
 
   get isCameraMini(): boolean {
-    return this.isOwlDevice || OWL_CODENAMES.includes(this.model ?? '');
-  }
-
-  get isHawk(): boolean {
-    return this.model === 'hawk';
-  }
-
-  get isFloodlight(): boolean {
-    return this.model === 'superior';
+    return this.isOwlDevice;
   }
 
   get temperature(): number | null {
@@ -185,17 +178,25 @@ export class BlinkCamera extends BlinkDevice {
     // Local-storage clips use their discovery time for freshness: created_at
     // is the recording start and may already be outside the decay window by
     // the time the manifest surfaces the clip.
-    const triggerEnd =
-      Math.max(
-        Date.parse(lastMotion.created_at) || 0,
-        this.blink.getLocalMediaTimestamp(this.cameraID)
-      ) +
-      MOTION_TRIGGER_DECAY * 1000;
-    const triggerStart =
-      (this.network?.armedAt ?? this.network?.updatedAt ?? 0) -
-      ARMED_DELAY * 1000;
+    const eventAt = Math.max(
+      Date.parse(lastMotion.created_at) || 0,
+      this.blink.getLocalMediaTimestamp(this.cameraID)
+    );
+    const triggerEnd = eventAt + MOTION_TRIGGER_DECAY * 1000;
 
-    return Date.now() >= triggerStart && Date.now() <= triggerEnd;
+    // Events that predate arming are history and must not fire. The
+    // comparison is against the EVENT time, not the current time — gating on
+    // Date.now() is always satisfied once armed and suppresses nothing.
+    // ARMED_DELAY grants a grace window backwards from the arm instant so a
+    // clip recorded moments before the arm command completed still counts.
+    // This is deliberately the opposite direction from securitySystem's
+    // alarm gate, which waits ARMED_DELAY *after* arming to swallow the
+    // spurious event Blink emits on arm: suppressing an alarm is cheap,
+    // suppressing a motion notification loses it entirely.
+    const armedAt = this.network?.armedAt || 0;
+    const triggerStart = armedAt > 0 ? armedAt - ARMED_DELAY * 1000 : 0;
+
+    return eventAt >= triggerStart && Date.now() <= triggerEnd;
   }
 
   getEnabled(): boolean {
