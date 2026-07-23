@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.2...v1.12.0-beta.3) (2026-07-23)
+
+### Bug Fixes
+
+* **motion:** measure local storage clip freshness from discovery time ([#55](https://github.com/BitWise-0x/homebridge-blink-security/issues/55)) ([78cf404](https://github.com/BitWise-0x/homebridge-blink-security/commit/78cf4043a20ee508b963fc5afc0c1c8f810d8d8e))
+
 ## [1.12.0-beta.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.1...v1.12.0-beta.2) (2026-07-22)
 
 ### Bug Fixes
