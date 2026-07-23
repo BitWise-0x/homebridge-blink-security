@@ -256,6 +256,27 @@ describe('Blink.pollLocalStorage', () => {
     expect(api.requestLocalStorageManifest).not.toHaveBeenCalled();
   });
 
+  it('stamps discovery time so old recordings still count as fresh motion', async () => {
+    const { blink, api, poll, state } = makeHarness();
+    const oldStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    api.getLocalStorageManifest.mockResolvedValue({
+      manifest_id: 'm1',
+      clips: [{ id: '1', camera_name: 'FrontDoor', created_at: oldStart }],
+    });
+
+    const before = Date.now();
+    await poll();
+    state()!.nextPollAt = 0;
+    await poll();
+    await flush();
+
+    // Discovery timestamp is now, even though the recording started long ago
+    expect(blink.getLocalMediaTimestamp(42)).toBeGreaterThanOrEqual(before);
+    // The synthesized entry keeps the true recording start time
+    const entry = await blink.getCameraLastMotion(100, 42);
+    expect(entry?.created_at).toBe(oldStart);
+  });
+
   it('schedules the next poll on the regular cadence after success', async () => {
     const { poll, state } = makeHarness();
     await poll();

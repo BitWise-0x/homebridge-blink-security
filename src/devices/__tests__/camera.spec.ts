@@ -75,7 +75,10 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
   // timestamp or manifest-sourced motion is silently suppressed.
   const staleIso = '2026-01-01T00:00:00Z';
 
-  function makeArmedCamera(localMediaTimestamp: number): {
+  function makeArmedCamera(
+    localMediaTimestamp: number,
+    clipCreatedAt = localMediaTimestamp
+  ): {
     camera: BlinkCamera;
     getCameraLastMotion: ReturnType<typeof vi.fn>;
   } {
@@ -98,7 +101,7 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
       armedAt: Date.now() - 60 * 60 * 1000,
     };
     const getCameraLastMotion = vi.fn().mockResolvedValue({
-      created_at: new Date(localMediaTimestamp).toISOString(),
+      created_at: new Date(clipCreatedAt).toISOString(),
       source: LOCAL_STORAGE_SOURCE,
       device_id: 42,
       network_id: 100,
@@ -123,5 +126,16 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
     await expect(camera.getMotionDetected()).resolves.toBe(false);
     // Suppressed by the staleness gate before any media fetch.
     expect(getCameraLastMotion).not.toHaveBeenCalled();
+  });
+
+  // A clip's created_at is its recording START time; recording length plus
+  // manifest lag plus poll cadence can put it past the 90s decay before the
+  // plugin ever sees it. Freshness must follow discovery, not recording.
+  it('fires for a just-discovered clip whose recording started long ago', async () => {
+    const { camera } = makeArmedCamera(
+      Date.now() - 5 * 1000, // discovered 5s ago
+      Date.now() - 5 * 60 * 1000 // recording started 5 minutes ago
+    );
+    await expect(camera.getMotionDetected()).resolves.toBe(true);
   });
 });

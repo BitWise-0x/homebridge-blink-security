@@ -182,8 +182,15 @@ export class BlinkCamera extends BlinkDevice {
       return false;
     }
 
+    // Local-storage clips use their discovery time for freshness: created_at
+    // is the recording start and may already be outside the decay window by
+    // the time the manifest surfaces the clip.
     const triggerEnd =
-      (Date.parse(lastMotion.created_at) || 0) + MOTION_TRIGGER_DECAY * 1000;
+      Math.max(
+        Date.parse(lastMotion.created_at) || 0,
+        this.blink.getLocalMediaTimestamp(this.cameraID)
+      ) +
+      MOTION_TRIGGER_DECAY * 1000;
     const triggerStart =
       (this.network?.armedAt ?? this.network?.updatedAt ?? 0) -
       ARMED_DELAY * 1000;

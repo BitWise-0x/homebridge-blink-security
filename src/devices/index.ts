@@ -39,7 +39,7 @@ export const DOORBELL_DEVICE_TYPE = 'lotus';
 // Local-storage manifest polling is heavier than the cloud media check
 // (command POST + completion polling + manifest GET), so it runs on its own
 // slower cadence than the main refresh loop.
-export const LOCAL_STORAGE_POLL = 30;
+export const LOCAL_STORAGE_POLL = 20;
 export const LOCAL_STORAGE_STARTUP_DELAY = 90;
 
 export class Blink {
@@ -56,7 +56,14 @@ export class Blink {
   private readonly snapshotRate: number;
   // Newest local-storage clip per camera, synthesized as MediaEntry so the
   // existing motion consumers work unchanged (see getCameraLastMotion).
-  private readonly localMedia = new Map<number, MediaEntry>();
+  // discoveredAt drives the motion trigger window: a clip's created_at is
+  // its recording START time and can already be older than the 90s decay by
+  // the time the manifest surfaces it (recording length + manifest lag +
+  // poll cadence), which would silently drop the event.
+  private readonly localMedia = new Map<
+    number,
+    { entry: MediaEntry; discoveredAt: number }
+  >();
   private readonly localStorageState = new Map<number, LocalStoragePollState>();
 
   constructor(
@@ -534,9 +541,14 @@ export class Blink {
 
       const createdAt = Date.parse(clip.created_at) || 0;
       const existing = this.localMedia.get(device.cameraID);
-      const existingAt = existing ? Date.parse(existing.created_at) || 0 : 0;
+      const existingAt = existing
+        ? Date.parse(existing.entry.created_at) || 0
+        : 0;
       if (createdAt > existingAt) {
-        this.localMedia.set(device.cameraID, clipToMediaEntry(clip, device));
+        this.localMedia.set(device.cameraID, {
+          entry: clipToMediaEntry(clip, device),
+          discoveredAt: Date.now(),
+        });
         // Raw created_at logged so clock-skew/timezone issues are visible in
         // debug logs from the field.
         this.log.debug(
@@ -548,9 +560,14 @@ export class Blink {
     return clips.length;
   }
 
+  /**
+   * When the newest local-storage clip for a camera was DISCOVERED (not
+   * recorded). Motion freshness for local clips is measured from discovery:
+   * by the time a clip surfaces in the manifest its recording start time
+   * may already be outside the trigger decay window.
+   */
   getLocalMediaTimestamp(cameraID: number): number {
-    const entry = this.localMedia.get(cameraID);
-    return entry ? Date.parse(entry.created_at) || 0 : 0;
+    return this.localMedia.get(cameraID)?.discoveredAt ?? 0;
   }
 
   async setArmedState(networkID: number, arm = true): Promise<void> {
@@ -773,7 +790,7 @@ export class Blink {
     const res = await this.api
       .getMediaChange(this.motionPoll)
       .catch(() => ({ media: [] }));
-    const local = [...this.localMedia.values()];
+    const local = [...this.localMedia.values()].map(rec => rec.entry);
     const media = [...(res.media || []), ...local]
       .filter(m => !networkID || m.network_id === networkID)
       .filter(m => !cameraID || m.device_id === cameraID)
