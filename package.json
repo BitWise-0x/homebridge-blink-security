@@ -64,11 +64,12 @@
   "overrides": {
     "fastify": "^5.8.5",
     "npm": "^11.18.0",
-    "js-yaml": "^4.2.0",
-    "tar": "^7.5.16",
-    "nodemon": {
-      "brace-expansion": "^5.0.6"
-    }
+    "js-yaml": "^4.3.0",
+    "tar": "^7.5.19",
+    "find-my-way": "^9.7.0",
+    "brace-expansion": "^1.1.16 || ^2.0.2 || ^5.0.7",
+    "fast-uri": "^3.1.4",
+    "shell-quote": "^1.8.5"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
