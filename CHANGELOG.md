@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.5...v1.12.0-beta.6) (2026-07-23)
+
+### Bug Fixes
+
+* **deps:** resolve transitive advisories through overrides ([ea1e3b0](https://github.com/BitWise-0x/homebridge-blink-security/commit/ea1e3b0e0a8a746241df2cb418fb2ead6084fd89))
+
 ## [1.12.0-beta.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.4...v1.12.0-beta.5) (2026-07-23)
 
 ### Bug Fixes
