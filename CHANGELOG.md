@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.3...v1.12.0-beta.4) (2026-07-23)
+
+### Bug Fixes
+
+* **motion:** baseline first local storage manifest read to stop restart replays ([#56](https://github.com/BitWise-0x/homebridge-blink-security/issues/56)) ([86de291](https://github.com/BitWise-0x/homebridge-blink-security/commit/86de2911b9e58a7bd86ba247267bb6f961b4b054))
+
 ## [1.12.0-beta.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.2...v1.12.0-beta.3) (2026-07-23)
 
 ### Bug Fixes
