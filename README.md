@@ -20,14 +20,14 @@
 
 <!-- [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FBitWise-0x%2Fhomebridge-blink-security.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2FBitWise-0x%2Fhomebridge-blink-security?ref=badge_shield&issueType=security) -->
 <br>
-The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for <a href="https://blinkforhome.com">Amazon Blink</a> cameras, doorbells, and sirens — bringing your Blink devices into <a href="https://www.apple.com/ios/home/">Apple Home</a> with live view, motion detection, snapshots, and arm/disarm.
+The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for <a href="https://blinkforhome.com">Amazon Blink</a> cameras, doorbells, and sirens. Brings your Blink devices into <a href="https://www.apple.com/ios/home/">Apple Home</a> with live view, motion detection, snapshots, and arm/disarm.
 
 </span>
 <br><br>
 <p align="center">
-  <img src="homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home — camera feeds and security status" />
+  <img src="homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home camera feeds and security status" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home — security system arm/disarm" />
+  <img src="homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
 </p>
 
 <br>
@@ -50,10 +50,10 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 </div>
 
 > **Newer models work automatically.** Model types are listed for reference
-> only — the plugin routes each device by how the Blink account reports it,
-> not by its model string. Hardware released after this table (for example
-> the 2K+ outdoor cameras and doorbells) is supported without a plugin
-> update. If a device does not appear in HomeKit at all, please open an
+> only. The plugin routes each device by how the Blink account reports it,
+> not by its model string, so hardware released after this table (for
+> example the 2K+ outdoor cameras and doorbells) is supported without a
+> plugin update. If a device does not appear in HomeKit at all, open an
 > issue with your startup log.
 
 <br>
@@ -109,25 +109,26 @@ graph TD
 
 ## Features
 
-- **Live view** — IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras)
-- **Security system** — Arm/disarm per network, with optional manual arm switch and opt-in alarm triggering on motion (`enable-alarm-triggering`)
-- **Multi-network** — Supports multiple sync modules, each with independent arm/disarm
-- **Motion detection** — Motion events surfaced to HomeKit, detected by polling the Blink cloud (configurable interval, with debounce). Blink has no public push API, so detection lags the Blink app's own notification by roughly the clip upload time plus one poll cycle
-- **Motion enable/disable** — Per-camera switch to turn motion detection on or off
-- **Snapshots** — Periodic thumbnail refresh with caching and retry
-- **Battery** — Battery level and low-battery alerts (Outdoor/Indoor models)
-- **Temperature** — Ambient temperature sensor (Outdoor/Indoor models)
-- **Doorbell press** — Doorbell button presses raised as HomeKit doorbell events (delivered as push notifications by HomeKit; detection is via cloud polling, like motion)
-- **Privacy mode** — Per-camera switch to suppress snapshots when disarmed
-- **Night vision** — IR illuminator toggle (Outdoor/Indoor models)
-- **Clip recording** — Trigger a clip recording via momentary switch
-- **Live View clip saving** — Configurable per-network `lv_save` toggle to save or suppress Live View clips
-- **One-way audio** — Listen-in on IMMI cameras (Mini, Mini 2, Mini 2K+, Outdoor/Indoor, Doorbell, Floodlight) transcoded to AAC-ELD for HomeKit
-- **OAuth 2.0 + PKCE** — Token refresh and persistent sessions across restarts
-- **2FA** — One-time PIN verification for Blink's two-factor auth
-- **Snapshot fallback** — Streams the last thumbnail when live view is unavailable
-- **Stale accessory cleanup** — Removes devices no longer on your Blink account
-- **Retry with backoff** — Automatic retry on network errors and rate limiting
+- **Live view**: IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras)
+- **Security system**: Arm/disarm per network, with optional manual arm switch and opt-in alarm triggering on motion (`enable-alarm-triggering`)
+- **Multi-network**: Supports multiple sync modules, each with independent arm/disarm
+- **Motion detection**: Motion events surfaced to HomeKit by polling the Blink cloud (configurable interval, with debounce). Blink has no public push API, so detection trails the Blink app's own notification by roughly the clip upload time plus one poll cycle
+- **Local storage motion**: Motion notifications without a Blink subscription. Accounts with no cloud storage use clips saved to the Sync Module's USB drive instead (`local-storage-motion`)
+- **Motion enable/disable**: Per-camera switch to turn motion detection on or off
+- **Snapshots**: Periodic thumbnail refresh with caching and retry
+- **Battery**: Battery level and low-battery alerts (Outdoor/Indoor models)
+- **Temperature**: Ambient temperature sensor (Outdoor/Indoor models)
+- **Doorbell press**: Doorbell button presses raised as HomeKit doorbell events. HomeKit delivers the push notification; detection is via cloud polling, like motion
+- **Privacy mode**: Per-camera switch to suppress snapshots when disarmed
+- **Night vision**: IR illuminator toggle (Outdoor/Indoor models)
+- **Clip recording**: Trigger a clip recording via momentary switch
+- **Live View clip saving**: Per-network `lv_save` toggle to save or suppress Live View clips
+- **One-way audio**: Listen-in on IMMI cameras (Mini, Mini 2, Mini 2K+, Outdoor/Indoor, Doorbell, Floodlight) transcoded to AAC-ELD for HomeKit
+- **OAuth 2.0 + PKCE**: Token refresh and persistent sessions across restarts
+- **2FA**: One-time PIN verification for Blink's two-factor auth
+- **Snapshot fallback**: Streams the last thumbnail when live view is unavailable
+- **Stale accessory cleanup**: Removes devices no longer on your Blink account
+- **Retry with backoff**: Automatic retry on network errors and rate limiting
 
 <br>
 
@@ -176,7 +177,7 @@ Blink requires two-factor authentication on first login:
 1. Configure your `username` and `password` and restart Homebridge
 2. Blink will send a verification code to your email/phone
 3. Add the code to the `pin` field in config and restart Homebridge
-4. After successful verification, remove the `pin` field — the session is persisted
+4. After successful verification, remove the `pin` field; the session is persisted
 
 <br>
 
@@ -199,10 +200,10 @@ Blink requires two-factor authentication on first login:
 | `enable-audio`                     | boolean | `false`    | Enable one-way audio in Live View. Also requires Audio Streaming in the Blink app under Device Settings → Privacy                                                                                                                                                                                                                                                                                                           |
 | `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud                                                                                                                                                                                                                                                                                                                                                                                         |
 | `disable-thumbnail-refresh`        | boolean | `false`    | Disable automatic thumbnail refresh                                                                                                                                                                                                                                                                                                                                                                                         |
-| `blink-status-polling-seconds`     | integer | `10`       | Seconds between Blink system refreshes (range 1–300). Default 10. Lower values may trigger Blink rate-limiting; higher values reduce API load but delay arm/disarm state updates                                                                                                                                                                                                                                            |
+| `blink-status-polling-seconds`     | integer | `10`       | Seconds between Blink system refreshes (range 1-300). Default 10. Lower values may trigger Blink rate-limiting; higher values reduce API load but delay arm/disarm state updates                                                                                                                                                                                                                                            |
 | `camera-thumbnail-refresh-seconds` | integer | `3600`     | Minimum seconds between Blink cloud thumbnail refreshes per camera (HomeKit polls and is served cached thumbnails between refreshes)                                                                                                                                                                                                                                                                                        |
 | `camera-status-polling-seconds`    | integer | `20`       | Camera status polling interval in seconds. Effective cadence rounds up to the next `blink-status-polling-seconds` tick                                                                                                                                                                                                                                                                                                      |
-| `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds. Effectively capped at `blink-status-polling-seconds` — a longer value would only add notification latency without reducing API load                                                                                                                                                                                                                                           |
+| `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds. Effectively capped at `blink-status-polling-seconds`; a longer value would only add notification latency without reducing API load                                                                                                                                                                                                                                            |
 | `local-storage-motion`             | string  | `"auto"`   | Detect motion from Sync Module local (USB) storage clips on accounts without cloud clip storage. `"auto"` engages only while no cloud clips exist; `"always"` / `"never"` force it on or off. Local clips are checked every ~20s, clips already on the drive at startup are never replayed as motion, and doorbell button presses are reported as motion on this path (Blink's local manifest does not distinguish presses) |
 | `logging`                          | string  |            | `"quiet"` suppresses routine chatter (thumbnail refresh, reconfigure, clip recording, sleep). `"verbose"` or `"debug"` for extended logging                                                                                                                                                                                                                                                                                 |
 | `enable-startup-diagnostic`        | boolean | `false`    | Log diagnostic info on startup                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -216,7 +217,7 @@ Blink requires two-factor authentication on first login:
 - Node.js 18.20.4+, 20.18.0+, 22.10.0+, or 24.0.0+
 - Homebridge 1.8.0+ or 2.0.0-beta+
 
-FFmpeg is bundled via the [`ffmpeg-for-homebridge`](https://github.com/homebridge/ffmpeg-for-homebridge) dependency — no separate install is needed, and it ships with `libfdk_aac` enabled for AAC-ELD audio.
+FFmpeg is bundled via the [`ffmpeg-for-homebridge`](https://github.com/homebridge/ffmpeg-for-homebridge) dependency. No separate install is needed, and it ships with `libfdk_aac` enabled for AAC-ELD audio.
 
 ### Setup
 
@@ -245,7 +246,7 @@ npm run prettier    # check formatting
 npm run format      # auto-fix formatting
 ```
 
-Commits must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary) — enforced by pre-commit hooks via [commitlint](https://commitlint.js.org/) and [husky](https://typicode.github.io/husky/).
+Commits must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary), enforced by pre-commit hooks via [commitlint](https://commitlint.js.org/) and [husky](https://typicode.github.io/husky/).
 
 <br>
 
@@ -267,6 +268,18 @@ If Audio Streaming is disabled in the Blink app, the camera sends malformed audi
 
 If Live View spins and eventually shows "Not responding" in the Home app, the most common cause is audio being enabled in plugin config while Audio Streaming is disabled in the Blink app for that camera. Either enable Audio Streaming in the Blink app, or set `enable-audio: false` in plugin config.
 
+### HomeKit notifications arrive later than the Blink app
+
+The Blink app is notified by Blink's private push service the moment a camera starts recording. There is no public push API, so the plugin can only discover an event by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided.
+
+### No motion notifications without a Blink subscription
+
+Accounts without a cloud storage plan have an empty cloud media list, so cloud polling finds nothing to report. Put a USB drive in the Sync Module and enable Local Storage in the Blink app; the plugin then detects motion from the sync module's local storage manifest instead. The startup log shows what the plugin sees, e.g. `Local storage: compatible=true, enabled=true, status=active`. The `local-storage-motion` option controls the fallback; the default `auto` engages it only while the cloud media list is empty.
+
+### Motion notifications point at the Security System instead of the camera
+
+That is `enable-alarm-triggering`: when on, motion while armed reports the Security System as triggered, and HomeKit treats that alert as more urgent than the per-camera motion notifications. Leave it off (the default) for camera-specific notifications that open that camera's stream when tapped. Per-camera notifications also require Activity Notifications to be enabled for each camera in the Home app, and motion only fires while the system is armed.
+
 ### VPN Interference
 
 Blink's authentication servers may reject login requests made through a VPN, returning HTTP 406 with no 2FA code sent. If you're unable to complete initial setup:
@@ -274,7 +287,7 @@ Blink's authentication servers may reject login requests made through a VPN, ret
 1. Disconnect your VPN
 2. Restart the Homebridge child bridge
 3. Complete 2FA verification
-4. You can re-enable your VPN after authentication succeeds — sessions are persisted
+4. You can re-enable your VPN after authentication succeeds; sessions are persisted
 
 ### General
 
@@ -290,10 +303,10 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 
 ## Useful Resources
 
-> **Read the full write-up:** [Homebridge SmartRent & Blink](https://blog.bitwise0x.com/blog/homebridge-smartrent-blink) — an architectural deep-dive into how both plugins map their respective APIs into HomeKit (HAP service composition, IMMI streaming, OAuth/2FA, motion polling).
+> **Read the full write-up:** [Homebridge SmartRent & Blink](https://blog.bitwise0x.com/blog/homebridge-smartrent-blink), an architectural deep-dive into how both plugins map their respective APIs into HomeKit (HAP service composition, IMMI streaming, OAuth/2FA, motion polling).
 
-- [MattTW/BlinkMonitorProtocol](https://github.com/MattTW/BlinkMonitorProtocol) — Blink API documentation
-- [fronzbot/blinkpy](https://github.com/fronzbot/blinkpy) — Python Blink library (Home Assistant)
+- [MattTW/BlinkMonitorProtocol](https://github.com/MattTW/BlinkMonitorProtocol): Blink API documentation
+- [fronzbot/blinkpy](https://github.com/fronzbot/blinkpy): Python Blink library (Home Assistant)
 - [Homebridge Developer Documentation](https://developers.homebridge.io/)
 - [Apple HomeKit Documentation](https://developer.apple.com/documentation/homekit/)
 
