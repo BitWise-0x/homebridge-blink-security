@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.6...v1.12.0-beta.7) (2026-07-24)
+
+### Bug Fixes
+
+* **motion:** stop gating motion on the homescreen check-in timestamp ([30871fc](https://github.com/BitWise-0x/homebridge-blink-security/commit/30871fc0a5f12fe3affc5b3a1672c1569fc68b9a))
+
 ## [1.12.0-beta.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.5...v1.12.0-beta.6) (2026-07-23)
 
 ### Bug Fixes
