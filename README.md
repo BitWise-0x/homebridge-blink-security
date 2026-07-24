@@ -268,6 +268,20 @@ If Audio Streaming is disabled in the Blink app, the camera sends malformed audi
 
 If Live View spins and eventually shows "Not responding" in the Home app, the most common cause is audio being enabled in plugin config while Audio Streaming is disabled in the Blink app for that camera. Either enable Audio Streaming in the Blink app, or set `enable-audio: false` in plugin config.
 
+### No HomeKit notifications at all
+
+Notification preferences live in iOS, not in the plugin, and they are per accessory and default to off for new accessories. To enable them for each camera:
+
+1. Open the Home app and long-press the camera
+2. Tap the settings (gear) icon
+3. Tap **Status and Notifications**
+4. Turn on **Activity Notifications**
+5. Check the **Time** and **People** conditions underneath; "only when I'm not home" is a common silent default that drops every notification while you are home
+
+Arm/disarm alerts have their own toggle: repeat the same steps on the security system tile.
+
+These settings reset whenever HomeKit sees an accessory as new: re-pairing the bridge, removing and re-adding a device, or migrating from another Blink plugin all create new accessories with notifications off, even though the Home app shows the same names. If notifications stop after one of those events, re-enable them.
+
 ### HomeKit notifications arrive later than the Blink app
 
 The Blink app is notified by Blink's private push service the moment a camera starts recording. There is no public push API, so the plugin can only discover an event by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided.
