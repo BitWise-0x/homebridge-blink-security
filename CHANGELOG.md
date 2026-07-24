@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.12](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.11...v1.12.0-beta.12) (2026-07-24)
+
+### Features
+
+* **alarm:** make motion alarm triggering opt-in and fix state oscillation ([731d69f](https://github.com/BitWise-0x/homebridge-blink-security/commit/731d69fc8715737b49a95ace9a92d9c0bd7bc95b))
+
 ## [1.12.0-beta.11](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.10...v1.12.0-beta.11) (2026-07-24)
 
 ### Bug Fixes
