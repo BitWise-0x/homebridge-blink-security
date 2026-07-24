@@ -69,7 +69,7 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   noThumbnailRefresh: false,
   blinkStatusPollingSeconds: 10,
   snapshotSeconds: 3600,
-  statusPollingSeconds: 30,
+  statusPollingSeconds: 20,
   motionPollingSeconds: 15,
   verbose: false,
   debug: false,

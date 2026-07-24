@@ -33,7 +33,7 @@ describe('normalizeConfig', () => {
       expect(opts.noThumbnailRefresh).toBe(false);
       expect(opts.blinkStatusPollingSeconds).toBe(10);
       expect(opts.snapshotSeconds).toBe(3600);
-      expect(opts.statusPollingSeconds).toBe(30);
+      expect(opts.statusPollingSeconds).toBe(20);
       expect(opts.motionPollingSeconds).toBe(15);
       expect(opts.verbose).toBe(false);
       expect(opts.debug).toBe(false);

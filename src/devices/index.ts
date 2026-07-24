@@ -34,7 +34,7 @@ export { BlinkSiren } from './siren.js';
 
 export const THUMBNAIL_TTL = 60 * 60;
 export const MOTION_POLL = 15;
-export const STATUS_POLL = 30;
+export const STATUS_POLL = 20;
 export const ARMED_DELAY = 60;
 export const MOTION_TRIGGER_DECAY = 90;
 export const DOORBELL_DEVICE_TYPE = 'lotus';
