@@ -154,19 +154,13 @@ export class BlinkCamera extends BlinkDevice {
       return false;
     }
 
-    // Local-storage clips don't bump the homescreen updated_at, so their
-    // timestamp participates in the staleness gate directly.
-    const lastDeviceUpdate =
-      Math.max(
-        this.updatedAt,
-        this.network?.updatedAt ?? 0,
-        this.blink.getLocalMediaTimestamp(this.cameraID)
-      ) +
-      MOTION_TRIGGER_DECAY * 1000;
-    if (Date.now() > lastDeviceUpdate) {
-      return false;
-    }
-
+    // No staleness gate on the homescreen's updated_at here. That field
+    // tracks device check-ins, not recordings, and for battery cameras it
+    // routinely lags minutes behind a clip; gating on it silently dropped
+    // genuinely fresh motion, so the Blink app notified instantly while
+    // HomeKit stayed quiet. Freshness is already bounded below by the
+    // event's own timestamp against MOTION_TRIGGER_DECAY, which is the
+    // correct measure.
     const lastMotion = await this.blink.getCameraLastMotion(
       this.networkID,
       this.cameraID

@@ -112,12 +112,8 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
   });
 
   it('does not fire for a local clip older than the trigger decay', async () => {
-    const { camera, getCameraLastMotion } = makeArmedCamera(
-      Date.now() - 10 * 60 * 1000
-    );
+    const { camera } = makeArmedCamera(Date.now() - 10 * 60 * 1000);
     await expect(camera.getMotionDetected()).resolves.toBe(false);
-    // Suppressed by the staleness gate before any media fetch.
-    expect(getCameraLastMotion).not.toHaveBeenCalled();
   });
 
   // A clip's created_at is its recording START time; recording length plus
@@ -127,6 +123,18 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
     const { camera } = makeArmedCamera(
       Date.now() - 5 * 1000, // discovered 5s ago
       Date.now() - 5 * 60 * 1000 // recording started 5 minutes ago
+    );
+    await expect(camera.getMotionDetected()).resolves.toBe(true);
+  });
+
+  // The homescreen's updated_at tracks device check-ins, not recordings, and
+  // for battery cameras it can lag minutes behind a clip. Gating motion on it
+  // dropped genuinely fresh events: the Blink app notified instantly while
+  // HomeKit stayed silent.
+  it('fires for a fresh clip even when the homescreen updated_at is stale', async () => {
+    const { camera } = makeArmedCamera(
+      0, // no local media
+      Date.now() - 3 * 1000 // cloud clip recorded 3s ago
     );
     await expect(camera.getMotionDetected()).resolves.toBe(true);
   });
