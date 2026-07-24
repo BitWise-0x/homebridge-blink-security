@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.11](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.10...v1.12.0-beta.11) (2026-07-24)
+
+### Bug Fixes
+
+* **polling:** push accessory updates even when the status refresh fails ([6ae0681](https://github.com/BitWise-0x/homebridge-blink-security/commit/6ae0681eb14f76dd41d38da9edf4c52b6f0cde21))
+
 ## [1.12.0-beta.10](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.9...v1.12.0-beta.10) (2026-07-24)
 
 ### Bug Fixes
