@@ -33,6 +33,12 @@
         "description": "When combined with the arm switch (used for automation), the Security System will have to be controlled by the Blink App.",
         "type": "boolean"
       },
+      "enable-alarm-triggering": {
+        "title": "Enable Alarm Triggering",
+        "placeholder": false,
+        "description": "Report the Security System as triggered in HomeKit when a camera detects motion while armed. HomeKit treats the triggered alert as more urgent than per-camera motion notifications, so it takes over the lock screen; leave this off for camera-specific notifications that open the camera's stream when tapped.",
+        "type": "boolean"
+      },
       "hide-manual-arm-switch": {
         "title": "Hide Sync Module Arm Switch",
         "placeholder": true,
@@ -165,6 +171,7 @@
       "expanded": false,
       "items": [
         "hide-alarm",
+        "enable-alarm-triggering",
         "hide-manual-arm-switch",
         "hide-enabled-switch",
         "hide-privacy-switch",

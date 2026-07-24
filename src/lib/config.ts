@@ -5,6 +5,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   password: string;
   pin?: string;
   'hide-alarm'?: boolean;
+  'enable-alarm-triggering'?: boolean;
   'hide-manual-arm-switch'?: boolean;
   'hide-temperature-sensor'?: boolean;
   'hide-enabled-switch'?: boolean;
@@ -32,6 +33,7 @@ export interface BlinkOptions {
   pin?: string;
   storagePath: string;
   noAlarm: boolean;
+  alarmTriggering: boolean;
   noManualArmSwitch: boolean;
   noTemperatureSensor: boolean;
   noEnabledSwitch: boolean;
@@ -58,6 +60,9 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   password: '',
   storagePath: '',
   noAlarm: false,
+  // Off by default: on 1.11.x the escalation was unreachable in practice,
+  // so camera-only notifications are the behavior users actually know.
+  alarmTriggering: false,
   noManualArmSwitch: false,
   noTemperatureSensor: false,
   noEnabledSwitch: false,
@@ -113,6 +118,7 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   };
 
   checkBoolean('hide-alarm', 'noAlarm');
+  checkBoolean('enable-alarm-triggering', 'alarmTriggering');
   checkBoolean('hide-manual-arm-switch', 'noManualArmSwitch');
   checkBoolean('hide-temperature-sensor', 'noTemperatureSensor');
   checkBoolean('hide-enabled-switch', 'noEnabledSwitch');

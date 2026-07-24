@@ -171,7 +171,12 @@ export class SecuritySystemAccessory {
 
   private async getCurrentState(): Promise<number> {
     const currentState = this.getSecurityState();
+    // Escalation is opt-in: reporting ALARM_TRIGGERED makes HomeKit send a
+    // "system triggered" alert that outranks the per-camera motion
+    // notifications. Without it, motion only fires the camera sensors and
+    // notifications tap through to the camera stream.
     if (
+      this.config.alarmTriggering &&
       currentState !== this.Characteristic.SecuritySystemCurrentState.DISARMED
     ) {
       const triggerStart =
@@ -213,24 +218,32 @@ export class SecuritySystemAccessory {
     const targetArmed =
       value !== this.Characteristic.SecuritySystemTargetState.DISARM;
     await this.network.setArmedState(targetArmed);
-    this.pushStateUpdate();
+    await this.pushStateUpdate();
   }
 
   /** Push current state to HomeKit (called after arm/disarm and from poll loop). */
   updateState(): void {
-    this.pushStateUpdate();
+    this.pushStateUpdate().catch(() => {
+      /* state push is best effort */
+    });
   }
 
-  private pushStateUpdate(): void {
-    const currentState = this.getSecurityState();
+  private async pushStateUpdate(): Promise<void> {
     if (this.securityService) {
+      // The pushed state must be the same computation the onGet read
+      // returns. Pushing the base armed state while a read reports
+      // ALARM_TRIGGERED makes HomeKit oscillate between the two, firing
+      // "triggered" and "set to away" notifications on every poll cycle
+      // for as long as the motion decay lasts.
+      const currentState = await this.getCurrentState();
       this.securityService.updateCharacteristic(
         this.Characteristic.SecuritySystemCurrentState,
         currentState
       );
+      // Target state never carries the triggered escalation.
       this.securityService.updateCharacteristic(
         this.Characteristic.SecuritySystemTargetState,
-        currentState
+        this.getSecurityState()
       );
     }
     if (this.armSwitchService) {
