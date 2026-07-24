@@ -298,6 +298,33 @@ describe('BlinkSecurityPlatform accessory sync', () => {
     const names = harness.registered.flat().map(a => a.displayName);
     expect(names).toEqual(['Blink Cam 1']);
   });
+
+  // A hung or failed status refresh must not stall motion delivery. The
+  // motion getters fetch the media list through their own cached request
+  // path, so updates can and must still be pushed after a refresh error.
+  it('still pushes accessory updates when the status refresh fails', async () => {
+    vi.useFakeTimers();
+    try {
+      setBlink([1]);
+      sync();
+      const p = platform as unknown as {
+        blink: { refreshData?: unknown };
+        poll: () => Promise<void>;
+        pollTimer?: NodeJS.Timeout;
+        cameraAccessories: { updateState: ReturnType<typeof vi.fn> }[];
+      };
+      p.blink.refreshData = vi.fn().mockRejectedValue(new Error('timeout'));
+
+      await p.poll();
+
+      expect(p.cameraAccessories[0].updateState).toHaveBeenCalled();
+      if (p.pollTimer) {
+        clearTimeout(p.pollTimer);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 /**

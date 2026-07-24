@@ -413,12 +413,16 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         this.lastDeviceFingerprint = fingerprint;
         this.syncAccessories();
       }
-      this.pushUpdates();
     } catch (err) {
       this.log.error(String(err));
       this.pollBackoff.increment();
     }
 
+    // Outside the try: a hung or failed status refresh must not stall
+    // motion delivery. The motion getters fetch the media list through
+    // their own cached request path, which does not depend on the
+    // homescreen call that just failed.
+    this.pushUpdates();
     this.schedulePoll();
   }
 
