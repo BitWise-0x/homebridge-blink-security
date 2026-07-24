@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.8...v1.12.0-beta.9) (2026-07-24)
+
+### Bug Fixes
+
+* **motion:** add debug tracing to the motion decision path ([54f5b9d](https://github.com/BitWise-0x/homebridge-blink-security/commit/54f5b9dc2ae8716e74f9f65e13415c7b3fc28cf8))
+
 ## [1.12.0-beta.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.7...v1.12.0-beta.8) (2026-07-24)
 
 ### Bug Fixes
