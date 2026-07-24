@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.2...v1.12.0) (2026-07-24)
+
+### Features
+
+* **motion:** fall back to sync module local storage for motion events ([#55](https://github.com/BitWise-0x/homebridge-blink-security/issues/55)) ([c556181](https://github.com/BitWise-0x/homebridge-blink-security/commit/c5561810afa668b2bf05cf51640d5a1649b7cd05))
+* **alarm:** make motion alarm triggering opt-in and fix state oscillation ([731d69f](https://github.com/BitWise-0x/homebridge-blink-security/commit/731d69fc8715737b49a95ace9a92d9c0bd7bc95b))
+
+### Bug Fixes
+
+* **motion:** add debug tracing to the motion decision path ([54f5b9d](https://github.com/BitWise-0x/homebridge-blink-security/commit/54f5b9dc2ae8716e74f9f65e13415c7b3fc28cf8))
+* **motion:** baseline first local storage manifest read to stop restart replays ([#56](https://github.com/BitWise-0x/homebridge-blink-security/issues/56)) ([86de291](https://github.com/BitWise-0x/homebridge-blink-security/commit/86de2911b9e58a7bd86ba247267bb6f961b4b054))
+* **devices:** correct local storage motion, device routing and accessory lifecycle ([0019ae2](https://github.com/BitWise-0x/homebridge-blink-security/commit/0019ae21b838fa397b50f51811820cbc936f1f05))
+* **motion:** fire clips recorded while armed that surface after disarm ([ab4c7a0](https://github.com/BitWise-0x/homebridge-blink-security/commit/ab4c7a00d8da77e67d9552bf20bc4abcc5f7e628))
+* **motion:** make local storage manifest polling resilient to busy networks ([#55](https://github.com/BitWise-0x/homebridge-blink-security/issues/55)) ([5c370aa](https://github.com/BitWise-0x/homebridge-blink-security/commit/5c370aa8b0cc88aca869db3fb5618caad406c941))
+* **motion:** measure local storage clip freshness from discovery time ([#55](https://github.com/BitWise-0x/homebridge-blink-security/issues/55)) ([78cf404](https://github.com/BitWise-0x/homebridge-blink-security/commit/78cf4043a20ee508b963fc5afc0c1c8f810d8d8e))
+* **polling:** push accessory updates even when the status refresh fails ([6ae0681](https://github.com/BitWise-0x/homebridge-blink-security/commit/6ae0681eb14f76dd41d38da9edf4c52b6f0cde21))
+* **deps:** resolve transitive advisories through overrides ([ea1e3b0](https://github.com/BitWise-0x/homebridge-blink-security/commit/ea1e3b0e0a8a746241df2cb418fb2ead6084fd89))
+* **motion:** stop gating motion on the homescreen check-in timestamp ([30871fc](https://github.com/BitWise-0x/homebridge-blink-security/commit/30871fc0a5f12fe3affc5b3a1672c1569fc68b9a))
+* **logging:** stop reporting non-camera homescreen groups as unsupported ([82e8fd8](https://github.com/BitWise-0x/homebridge-blink-security/commit/82e8fd813d7dd4e528e678fdf987f6fcaa58548d))
+
+### Performance Improvements
+
+* **polling:** poll camera status every 20 seconds by default ([a38bd72](https://github.com/BitWise-0x/homebridge-blink-security/commit/a38bd7254911b1b16fd111f0ad540b1a7c1ee4f6))
+
 ## [1.12.0-beta.12](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.11...v1.12.0-beta.12) (2026-07-24)
 
 ### Features
