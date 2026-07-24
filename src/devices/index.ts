@@ -129,7 +129,8 @@ export class Blink {
    * log line to explain why.
    */
   private warnUnknownHomescreenDevices(homescreen: unknown): void {
-    const known = new Set([
+    // Collections this plugin handles.
+    const handled = new Set([
       'cameras',
       'owls',
       'doorbells',
@@ -138,27 +139,47 @@ export class Blink {
       'sync_modules',
       'sirens',
     ]);
+    // Collections Blink sends that are deliberately not exposed to HomeKit.
+    // Warning about these would ask users to report hardware and account
+    // metadata the plugin has no intention of supporting.
+    const ignored = new Set([
+      'chimes',
+      'ring_devices',
+      'accessories',
+      'app_updates',
+      'subscriptions',
+      'entitlements',
+      'device_limits',
+      'tiv_lock_status',
+      'whats_new',
+      'account',
+      'video_stats',
+    ]);
+
     for (const [key, value] of Object.entries(
       (homescreen ?? {}) as Record<string, unknown>
     )) {
-      if (known.has(key) || this.unknownDeviceGroups.has(key)) {
+      if (
+        handled.has(key) ||
+        ignored.has(key) ||
+        this.unknownDeviceGroups.has(key)
+      ) {
         continue;
       }
-      // Only collections whose entries carry a device shape are worth
-      // reporting; account metadata and scalar fields are not.
-      // Some entry carrying an id is enough: a new family may name its keys
-      // differently (camera_id, device_id) or mix shapes, and demanding
-      // every entry expose both id and network_id would silently skip it.
-      const looksLikeDevices =
+      // Only report collections that look like CAMERAS specifically: a
+      // network_id plus a camera-ish field. Matching on a bare `id` swept up
+      // subscriptions, entitlements and other account metadata.
+      const looksLikeCameras =
         Array.isArray(value) &&
         value.length > 0 &&
         value.some(
           entry =>
             typeof entry === 'object' &&
             entry !== null &&
-            ['id', 'camera_id', 'device_id'].some(k => k in entry)
+            'network_id' in entry &&
+            ['type', 'serial', 'thumbnail', 'fw_version'].some(k => k in entry)
         );
-      if (!looksLikeDevices) {
+      if (!looksLikeCameras) {
         continue;
       }
       this.unknownDeviceGroups.add(key);

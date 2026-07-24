@@ -105,6 +105,30 @@ describe('Blink.refreshData device discovery', () => {
     expect(warnings.length).toBe(1);
   });
 
+  // Blink's homescreen carries several collections that are not cameras and
+  // never will be. Warning about them tells the user to file a report for
+  // hardware this plugin has no business exposing.
+  it('does not warn about known non-camera collections', async () => {
+    const { blink, log } = makeBlink(
+      makeHomescreen({
+        chimes: [{ id: 1, network_id: 100, name: 'Chime' }],
+        ring_devices: [
+          { id: 2, name: 'Ring 1' },
+          { id: 3, name: 'Ring 2' },
+        ],
+        accessories: [{ id: 4, name: 'Accessory' }],
+        app_updates: [{ id: 5 }],
+        subscriptions: [{ id: 6 }],
+        entitlements: [{ id: 7 }],
+        tiv_lock_status: [{ id: 8 }],
+        device_limits: [{ id: 9 }],
+        whats_new: [{ id: 10 }],
+      })
+    );
+    await blink.refreshData();
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
   it('does not warn about non-device collections', async () => {
     const { blink, log } = makeBlink(
       makeHomescreen({ subscriptions: [{ plan: 'free' }] })
@@ -274,11 +298,21 @@ describe('Blink.refreshData device discovery', () => {
     expect(blink.networks.has(100)).toBe(true);
   });
 
-  // A new hardware family may name its identifier differently; requiring an
-  // exact id + network_id pair on every entry would skip it silently.
-  it('warns about a device group whose entries use another id field', async () => {
+  // A new camera family arriving in its own collection must be reported even
+  // if it does not use the exact field names the known collections use.
+  it('warns about a camera-shaped group under an unfamiliar key', async () => {
     const { blink, log } = makeBlink(
-      makeHomescreen({ gadgets: [{ device_id: 5, name: 'Gadget' }] })
+      makeHomescreen({
+        gadgets: [
+          {
+            id: 5,
+            network_id: 100,
+            name: 'Gadget',
+            serial: 'G5',
+            type: 'newbird',
+          },
+        ],
+      })
     );
     await blink.refreshData();
     expect(log.warn).toHaveBeenCalledWith(
