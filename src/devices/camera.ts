@@ -152,7 +152,14 @@ export class BlinkCamera extends BlinkDevice {
   }
 
   async getMotionDetected(): Promise<boolean> {
-    if (!this.armed) {
+    // A clip recorded while armed can surface after a disarm: recording
+    // plus upload takes longer than a quick arm/trigger/disarm cycle, and
+    // the Blink app still notifies for it. Disarming therefore only stops
+    // NEW events; an event stamped before the disarm instant stays
+    // eligible below. Without a recorded disarm instant the old behavior
+    // holds and disarmed means suppressed.
+    const disarmedAt = this.network?.disarmedAt || 0;
+    if (!this.armed && !disarmedAt) {
       this.traceMotion('suppressed: not armed');
       return false;
     }
@@ -176,8 +183,9 @@ export class BlinkCamera extends BlinkDevice {
     // Local-storage clips use their discovery time for freshness: created_at
     // is the recording start and may already be outside the decay window by
     // the time the manifest surfaces the clip.
+    const recordedAt = Date.parse(lastMotion.created_at) || 0;
     const eventAt = Math.max(
-      Date.parse(lastMotion.created_at) || 0,
+      recordedAt,
       this.blink.getLocalMediaTimestamp(this.cameraID)
     );
     const triggerEnd = eventAt + MOTION_TRIGGER_DECAY * 1000;
@@ -194,12 +202,23 @@ export class BlinkCamera extends BlinkDevice {
     const armedAt = this.network?.armedAt || 0;
     const triggerStart = armedAt > 0 ? armedAt - ARMED_DELAY * 1000 : 0;
 
-    const fired = eventAt >= triggerStart && Date.now() <= triggerEnd;
+    // While disarmed, only events RECORDED before the disarm count. The
+    // recording time is the right bound, not eventAt: a local-storage clip
+    // is discovered after the disarm by definition in this path, and its
+    // discovery time would fail the comparison for exactly the clips this
+    // gate exists to keep. This also keeps manual clip recordings and saved
+    // live views taken while disarmed from firing as motion.
+    const beforeDisarm =
+      this.armed || (recordedAt > 0 && recordedAt <= disarmedAt);
+    const fired =
+      beforeDisarm && eventAt >= triggerStart && Date.now() <= triggerEnd;
     const verdict = fired
       ? 'FIRED'
-      : eventAt < triggerStart
-        ? 'suppressed: predates arming'
-        : 'suppressed: decayed';
+      : !beforeDisarm
+        ? 'suppressed: after disarm'
+        : eventAt < triggerStart
+          ? 'suppressed: predates arming'
+          : 'suppressed: decayed';
     this.traceMotion(
       `${verdict} clip=${lastMotion.created_at}`,
       ` (eventAt=${eventAt}, armedAt=${armedAt})`

@@ -10,6 +10,7 @@ export interface BlinkDeviceContext {
   canonicalID?: string;
   data?: BlinkDeviceData;
   armedAt?: number;
+  disarmedAt?: number;
   _privacy?: boolean;
   _nightVision?: boolean;
   armed?: number;

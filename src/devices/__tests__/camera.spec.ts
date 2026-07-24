@@ -69,7 +69,8 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
   function makeArmedCamera(
     localMediaTimestamp: number,
     clipCreatedAt = localMediaTimestamp,
-    armedAt = Date.now() - 60 * 60 * 1000
+    armedAt = Date.now() - 60 * 60 * 1000,
+    networkOverrides: { armed?: boolean; disarmedAt?: number } = {}
   ): {
     camera: BlinkCamera;
     getCameraLastMotion: ReturnType<typeof vi.fn>;
@@ -91,6 +92,8 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
       armed: true,
       updatedAt: Date.parse(staleIso),
       armedAt,
+      disarmedAt: 0,
+      ...networkOverrides,
     };
     const getCameraLastMotion = vi.fn().mockResolvedValue({
       created_at: new Date(clipCreatedAt).toISOString(),
@@ -161,5 +164,63 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
       armedAt
     );
     await expect(camera.getMotionDetected()).resolves.toBe(true);
+  });
+
+  // Recording plus upload takes longer than a quick arm/trigger/disarm
+  // cycle, so a clip recorded while armed routinely surfaces only after the
+  // disarm. The Blink app notifies for those; suppressing them on the
+  // current armed state alone silently lost the event.
+  describe('clips surfacing after a disarm', () => {
+    it('fires for a clip recorded while armed that surfaced after disarm', async () => {
+      const now = Date.now();
+      const { camera } = makeArmedCamera(0, now - 20 * 1000, now - 60 * 1000, {
+        armed: false,
+        disarmedAt: now - 10 * 1000,
+      });
+      await expect(camera.getMotionDetected()).resolves.toBe(true);
+    });
+
+    // Local-storage clips take the longest to surface (manifest lag on top
+    // of recording), so their discovery is routinely post-disarm. The
+    // disarm bound must compare the RECORDING time; the discovery time is
+    // after the disarm by definition here.
+    it('fires for a local clip recorded while armed but discovered after disarm', async () => {
+      const now = Date.now();
+      const { camera } = makeArmedCamera(
+        now - 5 * 1000, // discovered post-disarm
+        now - 30 * 1000, // recorded while armed
+        now - 60 * 1000,
+        { armed: false, disarmedAt: now - 10 * 1000 }
+      );
+      await expect(camera.getMotionDetected()).resolves.toBe(true);
+    });
+
+    it('does not fire for a clip recorded after the disarm', async () => {
+      const now = Date.now();
+      const { camera } = makeArmedCamera(0, now - 5 * 1000, now - 60 * 1000, {
+        armed: false,
+        disarmedAt: now - 10 * 1000,
+      });
+      await expect(camera.getMotionDetected()).resolves.toBe(false);
+    });
+
+    it('does not fire while disarmed when no disarm instant was recorded', async () => {
+      const { camera } = makeArmedCamera(0, Date.now() - 5 * 1000, 0, {
+        armed: false,
+        disarmedAt: 0,
+      });
+      await expect(camera.getMotionDetected()).resolves.toBe(false);
+    });
+
+    it('does not fire for a pre-disarm clip once the decay window closes', async () => {
+      const now = Date.now();
+      const { camera } = makeArmedCamera(
+        0,
+        now - 10 * 60 * 1000,
+        now - 20 * 60 * 1000,
+        { armed: false, disarmedAt: now - 9 * 60 * 1000 }
+      );
+      await expect(camera.getMotionDetected()).resolves.toBe(false);
+    });
   });
 });
