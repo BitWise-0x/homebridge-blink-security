@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.10](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.9...v1.12.0-beta.10) (2026-07-24)
+
+### Bug Fixes
+
+* **motion:** fire clips recorded while armed that surface after disarm ([ab4c7a0](https://github.com/BitWise-0x/homebridge-blink-security/commit/ab4c7a00d8da77e67d9552bf20bc4abcc5f7e628))
+
+### Performance Improvements
+
+* **polling:** poll camera status every 20 seconds by default ([a38bd72](https://github.com/BitWise-0x/homebridge-blink-security/commit/a38bd7254911b1b16fd111f0ad540b1a7c1ee4f6))
+
 ## [1.12.0-beta.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.8...v1.12.0-beta.9) (2026-07-24)
 
 ### Bug Fixes
