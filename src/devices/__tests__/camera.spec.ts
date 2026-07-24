@@ -102,6 +102,7 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
       networks: new Map([[100, network]]),
       getCameraLastMotion,
       getLocalMediaTimestamp: vi.fn().mockReturnValue(localMediaTimestamp),
+      log: { debug: vi.fn() },
     } as unknown as Blink;
     return { camera: new BlinkCamera(data, blink), getCameraLastMotion };
   }

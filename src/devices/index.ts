@@ -76,6 +76,9 @@ export class Blink {
   // media fallback are absent from it by nature, so their absence must never
   // be read as a removal.
   private readonly homescreenDoorbells = new Set<number>();
+  // Last logged cloud media summary, so getMergedMedia only logs when the
+  // media list actually changes rather than on every camera every poll.
+  private mediaTrace = '';
 
   constructor(
     authClient: BlinkAuthClient,
@@ -1029,8 +1032,22 @@ export class Blink {
     const res = await this.api
       .getMediaChange(this.motionPoll)
       .catch(() => ({ media: [] }));
+    const cloud = res.media || [];
+    // Logged before the per-camera filters so a clip whose device_id or
+    // network_id does not match any known device is still visible.
+    const newest = [...cloud].sort(
+      (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)
+    )[0];
+    const trace = newest
+      ? `${cloud.length} cloud clip(s), newest device_id=${newest.device_id} ` +
+        `network_id=${newest.network_id} created_at=${newest.created_at}`
+      : 'no cloud clips';
+    if (trace !== this.mediaTrace) {
+      this.mediaTrace = trace;
+      this.log.debug(`Blink media: ${trace}`);
+    }
     const local = [...this.localMedia.values()].map(rec => rec.entry);
-    return [...(res.media || []), ...local]
+    return [...cloud, ...local]
       .filter(m => !networkID || m.network_id === networkID)
       .filter(m => !cameraID || m.device_id === cameraID)
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));

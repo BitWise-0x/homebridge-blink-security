@@ -19,6 +19,8 @@ export class BlinkCamera extends BlinkDevice {
   // regardless of what codename it reports.
   readonly isOwlDevice: boolean;
   private cacheThumbnail = new Map<string, Buffer>();
+  // Last logged motion decision, so the poll loop only logs transitions.
+  private motionTrace = '';
 
   constructor(data: HomescreenCamera, blink: Blink, isOwlDevice = false) {
     super(data);
@@ -151,6 +153,7 @@ export class BlinkCamera extends BlinkDevice {
 
   async getMotionDetected(): Promise<boolean> {
     if (!this.armed) {
+      this.traceMotion('suppressed: not armed');
       return false;
     }
 
@@ -166,6 +169,7 @@ export class BlinkCamera extends BlinkDevice {
       this.cameraID
     );
     if (!lastMotion) {
+      this.traceMotion('no media for this camera');
       return false;
     }
 
@@ -190,7 +194,27 @@ export class BlinkCamera extends BlinkDevice {
     const armedAt = this.network?.armedAt || 0;
     const triggerStart = armedAt > 0 ? armedAt - ARMED_DELAY * 1000 : 0;
 
-    return eventAt >= triggerStart && Date.now() <= triggerEnd;
+    const fired = eventAt >= triggerStart && Date.now() <= triggerEnd;
+    const verdict = fired
+      ? 'FIRED'
+      : eventAt < triggerStart
+        ? 'suppressed: predates arming'
+        : 'suppressed: decayed';
+    this.traceMotion(
+      `${verdict} clip=${lastMotion.created_at}`,
+      ` (eventAt=${eventAt}, armedAt=${armedAt})`
+    );
+    return fired;
+  }
+
+  // Log the motion decision only on transitions: the poll loop re-evaluates
+  // every few seconds and identical lines would drown the debug log.
+  private traceMotion(key: string, detail = ''): void {
+    if (key === this.motionTrace) {
+      return;
+    }
+    this.motionTrace = key;
+    this.blink.log.debug(`${this.name} motion: ${key}${detail}`);
   }
 
   getEnabled(): boolean {
