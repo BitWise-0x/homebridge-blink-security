@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.0-beta.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.7...v1.12.0-beta.8) (2026-07-24)
+
+### Bug Fixes
+
+* **logging:** stop reporting non-camera homescreen groups as unsupported ([82e8fd8](https://github.com/BitWise-0x/homebridge-blink-security/commit/82e8fd813d7dd4e528e678fdf987f6fcaa58548d))
+
 ## [1.12.0-beta.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0-beta.6...v1.12.0-beta.7) (2026-07-24)
 
 ### Bug Fixes
