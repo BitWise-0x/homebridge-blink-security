@@ -1,6 +1,28 @@
 export const sleep = (ms: number): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Reject if `promise` has not settled within `ms`. The underlying work is not
+ * cancelled, so this bounds the wait rather than the request itself. The timer
+ * is cleared on settle to avoid holding the event loop open.
+ */
+export const withTimeout = <T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms
+      );
+    }),
+  ]).finally(() => clearTimeout(timer)) as Promise<T>;
+};
+
 export const fahrenheitToCelsius = (temperature: number): number =>
   Math.round(((temperature - 32) / 1.8) * 10) / 10;
 

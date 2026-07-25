@@ -14,7 +14,7 @@ import {
 } from './lib/config.js';
 import { BlinkAuthClient, BlinkAuth2FARequiredError } from './lib/auth.js';
 import { routineInfo } from './lib/logInfo.js';
-import { ExponentialBackoff } from './lib/utils.js';
+import { ExponentialBackoff, withTimeout } from './lib/utils.js';
 import {
   Blink,
   type BlinkCamera,
@@ -26,6 +26,10 @@ import { SecuritySystemAccessory } from './accessories/securitySystem.js';
 import { CameraAccessory } from './accessories/camera.js';
 import { DoorbellAccessory } from './accessories/doorbell.js';
 import { SirenAccessory } from './accessories/siren.js';
+
+// Under the 30s client timeout so a stalled request bounds the cycle instead
+// of the loop waiting out the socket, and well above a healthy cycle.
+const POLL_CYCLE_TIMEOUT_MS = 25000;
 
 export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private readonly log: Logger;
@@ -404,7 +408,13 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
 
   private async poll(): Promise<void> {
     try {
-      await this.blink?.refreshData();
+      // Bounded because the loop re-arms only after this settles: refreshData
+      // awaits the media list through pollLocalStorage, and a hung request
+      // there would otherwise stop every poll until the socket timed out.
+      const refresh = this.blink?.refreshData();
+      if (refresh) {
+        await withTimeout(refresh, POLL_CYCLE_TIMEOUT_MS, 'Poll cycle');
+      }
       this.pollBackoff.reset();
       // Devices added or removed in the Blink app reach HomeKit here; the
       // fingerprint keeps the common no-change case free.
@@ -416,14 +426,12 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     } catch (err) {
       this.log.error(String(err));
       this.pollBackoff.increment();
+    } finally {
+      // In a finally so the loop re-arms on every path: a throw here would
+      // otherwise end polling for good, since nothing else reschedules it.
+      this.pushUpdates();
+      this.schedulePoll();
     }
-
-    // Outside the try: a hung or failed status refresh must not stall
-    // motion delivery. The motion getters fetch the media list through
-    // their own cached request path, which does not depend on the
-    // homescreen call that just failed.
-    this.pushUpdates();
-    this.schedulePoll();
   }
 
   private pushUpdates(): void {

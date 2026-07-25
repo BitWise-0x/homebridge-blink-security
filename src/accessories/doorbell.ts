@@ -29,6 +29,8 @@ export class DoorbellAccessory {
   private _controller?: CameraController;
   private _delegate?: BlinkCameraDelegate;
   private doorbellService?: Service;
+  // Last value pushed by the poll loop, served to HomeKit reads.
+  private lastMotion = false;
 
   constructor(
     doorbell: BlinkDoorbell,
@@ -259,9 +261,12 @@ export class DoorbellAccessory {
       this.applyConfiguredName(motionService, name);
     }
 
+    // Returns the value the poll loop last pushed rather than fetching:
+    // getMotionDetected hits the media endpoint, and HomeKit gives a read
+    // handler 10s before it declares the plugin unresponsive.
     motionService
       .getCharacteristic(this.Characteristic.MotionDetected)
-      .onGet(async () => this.doorbell.getMotionDetected());
+      .onGet(() => this.lastMotion);
   }
 
   private setupEnabledSwitch(): void {
@@ -365,6 +370,7 @@ export class DoorbellAccessory {
       this.doorbell
         .getMotionDetected()
         .then(motion => {
+          this.lastMotion = motion;
           motionService.updateCharacteristic(
             this.Characteristic.MotionDetected,
             motion

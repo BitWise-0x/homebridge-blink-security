@@ -89,6 +89,10 @@ interface HttpResponse {
 }
 
 const MAX_REDIRECTS = 5;
+// Matches the axios client timeout. Without it a stalled socket on the auth
+// path hangs forever, and because every request awaits getAccessToken() a
+// single hung refresh silently stalls every poll in the plugin.
+const REQUEST_TIMEOUT_MS = 30000;
 // Diagnostic: condense a signin response into a single log-safe line.
 // Used to surface the body/headers behind an unexpected status (e.g. 202),
 // where Blink's contract is undocumented and we can't tell the next step
@@ -208,6 +212,14 @@ function httpsRequest(
     );
 
     req.on('error', reject);
+
+    // Node fires 'timeout' but does not abort the request; destroy() is what
+    // ends it, surfacing through the 'error' handler above.
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy(
+        new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${url}`)
+      );
+    });
 
     if (options.body) {
       req.write(options.body);

@@ -14,6 +14,12 @@ interface CacheEntry {
   timestamp: number;
 }
 
+// A cached token returns immediately, so anything above this means a refresh
+// was actually awaited.
+const TOKEN_WAIT_WARN_MS = 1000;
+// Well under the 30s axios timeout so a stall is visible before it trips.
+const SLOW_REQUEST_WARN_MS = 5000;
+
 export class BlinkClient {
   private readonly authClient: BlinkAuthClient;
   private readonly log: Logger;
@@ -32,7 +38,17 @@ export class BlinkClient {
 
     this.client.interceptors.request.use(async config => {
       if (this.authClient.isAuthenticated) {
+        // Every request funnels through here, so a slow token refresh stalls
+        // all polling at once rather than one endpoint. Timed to tell that
+        // apart from a slow response on the request itself.
+        const started = Date.now();
         const token = await this.authClient.getAccessToken();
+        const waited = Date.now() - started;
+        if (waited >= TOKEN_WAIT_WARN_MS) {
+          this.log.warn(
+            `Token wait blocked request for ${waited}ms: ${config.url}`
+          );
+        }
         config.headers['Authorization'] = `Bearer ${token}`;
       }
       return config;
@@ -133,8 +149,17 @@ export class BlinkClient {
     this.log.debug(`${method} ${resolvedPath} @${maxTTL}`);
 
     let res: AxiosResponse;
+    const requestStart = Date.now();
     try {
       res = await this.client.request(config);
+      const elapsed = Date.now() - requestStart;
+      if (elapsed >= SLOW_REQUEST_WARN_MS) {
+        // Spans the auth interceptor too, so a matching token-wait warning
+        // means the token stalled, and its absence means the response did.
+        this.log.warn(
+          `Slow response (${elapsed}ms): ${method} ${resolvedPath}`
+        );
+      }
     } catch (err) {
       const error = err as Error;
       if (/ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT/.test(error.message)) {

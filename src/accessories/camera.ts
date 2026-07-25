@@ -28,6 +28,8 @@ export class CameraAccessory {
   private readonly hap: HAP;
   private _controller?: CameraController;
   private _delegate?: BlinkCameraDelegate;
+  // Last value pushed by the poll loop, served to HomeKit reads.
+  private lastMotion = false;
 
   constructor(
     camera: BlinkCamera,
@@ -244,9 +246,12 @@ export class CameraAccessory {
       this.applyConfiguredName(motionService, name);
     }
 
+    // Returns the value the poll loop last pushed rather than fetching:
+    // getMotionDetected hits the media endpoint, and HomeKit gives a read
+    // handler 10s before it declares the plugin unresponsive.
     motionService
       .getCharacteristic(this.Characteristic.MotionDetected)
-      .onGet(async () => this.camera.getMotionDetected());
+      .onGet(() => this.lastMotion);
   }
 
   private setupBattery(): void {
@@ -436,6 +441,7 @@ export class CameraAccessory {
       this.camera
         .getMotionDetected()
         .then(motion => {
+          this.lastMotion = motion;
           motionService.updateCharacteristic(
             this.Characteristic.MotionDetected,
             motion
