@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.0...v1.12.1) (2026-07-25)
+
+### Bug Fixes
+
+* **poll:** keep the poll loop alive when a request stalls ([f2e293c](https://github.com/BitWise-0x/homebridge-blink-security/commit/f2e293cf60bc9e61e43e30bf789a59d4c2b372c1))
+
 ## [1.12.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.11.2...v1.12.0) (2026-07-24)
 
 ### Features
