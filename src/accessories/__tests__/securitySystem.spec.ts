@@ -23,9 +23,11 @@ class FakeService {
     };
     return chain;
   }
+
   setCharacteristic() {
     return this;
   }
+
   addOptionalCharacteristic() {}
   updateCharacteristic(characteristic: unknown, value: unknown) {
     this.updates.push({ characteristic, value });

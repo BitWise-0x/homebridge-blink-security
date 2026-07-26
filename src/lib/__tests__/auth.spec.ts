@@ -167,14 +167,17 @@ describe('BlinkAuthClient', () => {
     it('loads existing hardware_id from file', () => {
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'existing-hw-id';
+          }
           return '';
         }
       );
@@ -206,17 +209,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -229,17 +238,23 @@ describe('BlinkAuthClient', () => {
     it('resets to UNAUTHENTICATED on corrupt JSON', () => {
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return '{corrupt';
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -268,17 +283,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -363,17 +384,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -404,17 +431,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -564,17 +597,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -610,17 +649,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -656,17 +701,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );
@@ -708,17 +759,23 @@ describe('BlinkAuthClient', () => {
       };
       (fs.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json')) return true;
-          if (typeof p === 'string' && p.includes('hardware_id')) return true;
+          if (typeof p === 'string' && p.includes('session.json')) {
+            return true;
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
+            return true;
+          }
           return false;
         }
       );
       (fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(
         (p: string) => {
-          if (typeof p === 'string' && p.includes('session.json'))
+          if (typeof p === 'string' && p.includes('session.json')) {
             return JSON.stringify(sessionData);
-          if (typeof p === 'string' && p.includes('hardware_id'))
+          }
+          if (typeof p === 'string' && p.includes('hardware_id')) {
             return 'hw-id';
+          }
           return '';
         }
       );

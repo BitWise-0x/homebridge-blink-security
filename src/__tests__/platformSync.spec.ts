@@ -30,13 +30,16 @@ function makeApi(): {
       this.displayName = displayName;
       this.UUID = uuid;
     }
+
     getService() {
       return undefined;
     }
+
     addService(service: unknown) {
       this.services.push(service);
       return service;
     }
+
     removeService() {}
     configureController() {}
   }
@@ -123,15 +126,19 @@ class TestPlatform extends BlinkSecurityPlatform {
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
   }
+
   protected override buildCameraAccessory(camera: never) {
     return this.make(camera) as never;
   }
+
   protected override buildDoorbellAccessory(doorbell: never) {
     return this.make(doorbell) as never;
   }
+
   protected override buildSecurityAccessory(network: never) {
     return this.make(network) as never;
   }
+
   protected override buildSirenAccessory(siren: never) {
     return this.make(siren) as never;
   }
@@ -343,6 +350,7 @@ describe('BlinkSecurityPlatform accessory rebuild safety', () => {
         return (this as unknown as { cachedAccessories: PlatformAccessory[] })
           .cachedAccessories;
       }
+
       private make(device: { canonicalID: string; name: string }) {
         const uuid = `uuid-${device.canonicalID}`;
         let accessory = this.cache().find(a => a.UUID === uuid);
@@ -365,15 +373,19 @@ describe('BlinkSecurityPlatform accessory rebuild safety', () => {
           shutdown: vi.fn().mockResolvedValue(undefined),
         };
       }
+
       protected override buildCameraAccessory(camera: never) {
         return this.make(camera) as never;
       }
+
       protected override buildDoorbellAccessory(doorbell: never) {
         return this.make(doorbell) as never;
       }
+
       protected override buildSecurityAccessory(network: never) {
         return this.make(network) as never;
       }
+
       protected override buildSirenAccessory(siren: never) {
         return this.make(siren) as never;
       }

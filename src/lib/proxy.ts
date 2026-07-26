@@ -28,7 +28,9 @@ function extractTrackUrl(sdp: string, baseUri: string): string {
     const controlMatch = videoSection[0].match(/a=control:(.+)/);
     if (controlMatch) {
       const control = controlMatch[1].trim();
-      if (control.startsWith('rtsp://')) return control;
+      if (control.startsWith('rtsp://')) {
+        return control;
+      }
       // Relative control — append to base URI
       return `${baseUri.replace(/\/$/, '')}/${control}`;
     }
@@ -97,7 +99,9 @@ export class RtspToH264Proxy {
       buf = buf.length
         ? Buffer.from(Buffer.concat([buf, chunk]))
         : Buffer.from(chunk);
-      if (onData) onData();
+      if (onData) {
+        onData();
+      }
     });
 
     // Helper: wait for a complete RTSP response in `buf`, return the body
@@ -116,16 +120,24 @@ export class RtspToH264Proxy {
         const tryParse = () => {
           // Skip any interleaved RTP frames ($) before the RTSP text response
           while (buf.length > 0 && buf[0] === 0x24) {
-            if (buf.length < 4) return;
+            if (buf.length < 4) {
+              return;
+            }
             const frameLen = 4 + buf.readUInt16BE(2);
-            if (buf.length < frameLen) return;
+            if (buf.length < frameLen) {
+              return;
+            }
             buf = Buffer.from(buf.subarray(frameLen));
           }
-          if (buf.length === 0) return;
+          if (buf.length === 0) {
+            return;
+          }
 
           if (!headersDone) {
             headerEnd = buf.indexOf('\r\n\r\n');
-            if (headerEnd === -1) return;
+            if (headerEnd === -1) {
+              return;
+            }
             headersDone = true;
             const headerStr = buf.subarray(0, headerEnd).toString('ascii');
             const clMatch = headerStr.match(/Content-Length:\s*(\d+)/i);
@@ -133,7 +145,9 @@ export class RtspToH264Proxy {
           }
 
           const bodyStart = headerEnd + 4;
-          if (buf.length - bodyStart < contentLength) return;
+          if (buf.length - bodyStart < contentLength) {
+            return;
+          }
 
           // Full response received
           clearTimeout(timer);
@@ -295,10 +309,14 @@ export class RtspToH264Proxy {
     while (buf.length > 0) {
       if (buf[0] === 0x24) {
         // Interleaved frame: $ + channel + length(2 BE) + payload
-        if (buf.length < 4) break;
+        if (buf.length < 4) {
+          break;
+        }
         const payloadLen = buf.readUInt16BE(2);
         const frameLen = 4 + payloadLen;
-        if (buf.length < frameLen) break;
+        if (buf.length < frameLen) {
+          break;
+        }
 
         const channel = buf[1];
         if (channel === 0 && payloadLen > 12) {
@@ -340,11 +358,15 @@ export class RtspToH264Proxy {
   }
 
   private _rtpHeaderLen(pkt: Buffer): number {
-    if (pkt.length < 12) return pkt.length;
+    if (pkt.length < 12) {
+      return pkt.length;
+    }
     const cc = pkt[0] & 0x0f;
     let offset = 12 + cc * 4;
     if (pkt[0] & 0x10) {
-      if (pkt.length < offset + 4) return pkt.length;
+      if (pkt.length < offset + 4) {
+        return pkt.length;
+      }
       const extLen = pkt.readUInt16BE(offset + 2);
       offset += 4 + extLen * 4;
     }
@@ -417,6 +439,7 @@ class ImmiFrameStripper extends Transform {
     number,
     { count: number; totalBytes: number }
   >();
+
   private _log?: Logger;
   private _firstVideoLogged = false;
 

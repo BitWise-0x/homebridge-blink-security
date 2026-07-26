@@ -68,6 +68,7 @@ export class Blink {
     number,
     { entry: MediaEntry; discoveredAt: number }
   >();
+
   private readonly localStorageState = new Map<number, LocalStoragePollState>();
   // Homescreen collections already reported as unrecognized, so the warning
   // fires once per group rather than on every poll.
