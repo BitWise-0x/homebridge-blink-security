@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
+import prettier from 'eslint-config-prettier';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,4 +74,8 @@ export default [
       '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
+  // Last so it wins: turns off the stylistic rules above that fight prettier
+  // (indent, quotes, max-len). Prettier owns formatting, eslint owns
+  // correctness. Rules like eqeqeq and curly are untouched.
+  prettier,
 ];
