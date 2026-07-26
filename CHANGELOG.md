@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.2...v1.12.3) (2026-07-26)
+
+### Bug Fixes
+
+* **poll:** raise poll cycle timeout above the client request timeout ([85bf81c](https://github.com/BitWise-0x/homebridge-blink-security/commit/85bf81c95482fb30c09fa5f0138d2ba10a2da842))
+
 ## [1.12.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.1...v1.12.2) (2026-07-26)
 
 ### Bug Fixes
