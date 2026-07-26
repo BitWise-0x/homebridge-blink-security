@@ -27,9 +27,11 @@ import { CameraAccessory } from './accessories/camera.js';
 import { DoorbellAccessory } from './accessories/doorbell.js';
 import { SirenAccessory } from './accessories/siren.js';
 
-// Under the 30s client timeout so a stalled request bounds the cycle instead
-// of the loop waiting out the socket, and well above a healthy cycle.
-const POLL_CYCLE_TIMEOUT_MS = 25000;
+// Above the 30s client timeout so a single stalled request fails first and
+// names the stuck URL. This is the outer backstop for a hang no per-request
+// timeout covers, and withTimeout does not cancel the work it bounds, so
+// firing first would only orphan a request the socket is still waiting on.
+const POLL_CYCLE_TIMEOUT_MS = 40000;
 
 export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private readonly log: Logger;
