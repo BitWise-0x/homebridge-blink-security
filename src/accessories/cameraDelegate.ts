@@ -67,6 +67,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly hap: HAP;
   private readonly liveViewEnabled: boolean;
   private readonly audioEnabled: boolean;
+  private readonly audioFilter: string;
   private readonly hideRoutineLogs: boolean;
   controller?: CameraController;
   private pendingSessions = new Map<string, SessionInfo>();
@@ -94,7 +95,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     hap: HAP,
     liveViewEnabled = true,
     audioEnabled = false,
-    hideRoutineLogs = false
+    hideRoutineLogs = false,
+    audioFilter = ''
   ) {
     this.blinkCamera = blinkCamera;
     this.log = log;
@@ -102,6 +104,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     this.liveViewEnabled = liveViewEnabled;
     this.audioEnabled = audioEnabled;
     this.hideRoutineLogs = hideRoutineLogs;
+    this.audioFilter = audioFilter;
   }
 
   async handleSnapshotRequest(
@@ -500,9 +503,15 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       const audioSRTP = sessionInfo.audioSRTP.toString('base64');
       const audioPort = sessionInfo.audioPort;
 
+      ffmpegArgs.push('-map', '0:a:0?');
+
+      // Optional user-supplied ffmpeg audio filtergraph (e.g. a volume
+      // boost). Applied before the encoder so aac_eld output is unchanged.
+      if (this.audioFilter) {
+        ffmpegArgs.push('-af', this.audioFilter);
+      }
+
       ffmpegArgs.push(
-        '-map',
-        '0:a:0?',
         '-codec:a',
         'libfdk_aac',
         '-profile:a',

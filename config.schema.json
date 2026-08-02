@@ -141,6 +141,12 @@
         "description": "Enable one-way audio in HomeKit Live View. Requires Audio Streaming to also be enabled in the Blink app under Device Settings → Privacy.",
         "type": "boolean"
       },
+      "audio-filter": {
+        "title": "Audio Filter (advanced)",
+        "type": "string",
+        "description": "Optional ffmpeg audio filtergraph applied to Live View audio, passed verbatim to -af. Leave blank for unprocessed audio. Example: volume=2.0,alimiter=limit=0.95 to double the volume without clipping. Requires Enable Audio. An invalid filtergraph will cause the stream to fail.",
+        "placeholder": "volume=2.0,alimiter=limit=0.95"
+      },
       "local-storage-motion": {
         "title": "Local Storage Motion Detection",
         "type": "string",
@@ -195,6 +201,7 @@
         "camera-status-polling-seconds",
         "camera-motion-polling-seconds",
         "local-storage-motion",
+        "audio-filter",
         "logging",
         "enable-startup-diagnostic"
       ]

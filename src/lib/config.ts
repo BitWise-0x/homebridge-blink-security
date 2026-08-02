@@ -22,6 +22,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   logging?: 'quiet' | 'verbose' | 'debug';
   'enable-startup-diagnostic'?: boolean;
   'enable-audio'?: boolean;
+  'audio-filter'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
 }
 
@@ -51,6 +52,7 @@ export interface BlinkOptions {
   debug: boolean;
   startupDiagnostic: boolean;
   enableAudio: boolean;
+  audioFilter: string;
   hideRoutineLogs: boolean;
   localStorageMotion: LocalStorageMotionMode;
 }
@@ -80,6 +82,7 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   debug: false,
   startupDiagnostic: false,
   enableAudio: false,
+  audioFilter: '',
   hideRoutineLogs: false,
   localStorageMotion: 'auto',
 };
@@ -134,6 +137,11 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   checkNumber('camera-motion-polling-seconds', 'motionPollingSeconds');
   checkBoolean('enable-startup-diagnostic', 'startupDiagnostic');
   checkBoolean('enable-audio', 'enableAudio');
+
+  const audioFilter = config['audio-filter']?.trim();
+  if (audioFilter) {
+    opts.audioFilter = audioFilter;
+  }
 
   if (opts.snapshotSeconds <= 0 || opts.noThumbnailRefresh) {
     opts.snapshotSeconds = Number.MAX_SAFE_INTEGER;
