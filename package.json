@@ -64,7 +64,7 @@
   "overrides": {
     "fastify": "^5.8.5",
     "npm": "^11.18.0",
-    "js-yaml": "^4.3.0",
+    "js-yaml": "^4.3.1",
     "tar": "^7.5.19",
     "find-my-way": "^9.7.0",
     "brace-expansion": "^1.1.16 || ^2.0.2 || ^5.0.7",
