@@ -26,6 +26,10 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
+        # prettier minors change formatting output, which fails prettier --check
+        # and wedges the whole group. It gets its own PR instead.
+        exclude-patterns:
+          - 'prettier'
       development-dependencies-major-updates:
         dependency-type: 'development'
         update-types:
