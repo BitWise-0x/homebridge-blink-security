@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.3...v1.12.4) (2026-09-04)
+
+### Bug Fixes
+
+* **deps:** patch dev-scope advisories and unblock dependabot automation ([bf5d465](https://github.com/BitWise-0x/homebridge-blink-security/commit/bf5d465322b116caa9d4c3adaf5c930637b76329))
+
 ## [1.12.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.2...v1.12.3) (2026-07-26)
 
 ### Bug Fixes
