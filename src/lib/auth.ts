@@ -35,10 +35,7 @@ const OAUTH_DOMAIN = new URL(OAUTH_BASE_URL).hostname;
 // --- Types ---
 
 export type AuthState =
-  | 'UNAUTHENTICATED'
-  | 'AWAITING_2FA'
-  | 'AUTHENTICATED'
-  | 'TOKEN_EXPIRED';
+  'UNAUTHENTICATED' | 'AWAITING_2FA' | 'AUTHENTICATED' | 'TOKEN_EXPIRED';
 
 export interface BlinkSession {
   accessToken: string;
