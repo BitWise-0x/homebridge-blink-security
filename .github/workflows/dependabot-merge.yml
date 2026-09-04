@@ -16,11 +16,13 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
       - name: Enable auto-merge for Dependabot PRs
+        # Only the minor/patch groups are named here on purpose: a major group
+        # with an empty update-type must never fall through to auto-merge.
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
           steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
-          (steps.metadata.outputs.update-type == '' && steps.metadata.outputs.dependency-group != '')
-        continue-on-error: true
+          steps.metadata.outputs.dependency-group == 'production-dependencies' ||
+          steps.metadata.outputs.dependency-group == 'development-dependencies'
         run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
