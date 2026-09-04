@@ -46,3 +46,10 @@ updates:
       - dependency-name: 'typescript'
         update-types:
           - 'version-update:semver-major'
+      # The conventionalcommits preset v10 needs conventional-changelog-writer@9,
+      # but @semantic-release/release-notes-generator still pins writer@8, so v10
+      # breaks generateNotes with a "Missing helper" error at release time. Stay
+      # on v9 until the semantic-release plugins ship writer@9.
+      - dependency-name: 'conventional-changelog-conventionalcommits'
+        update-types:
+          - 'version-update:semver-major'
