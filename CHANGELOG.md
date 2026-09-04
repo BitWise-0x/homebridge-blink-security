@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.12.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.4...v1.12.5) (2026-09-04)
+
+### Bug Fixes
+
+* **release:** pin conventional-changelog preset to v9 ([fc53a4f](https://github.com/BitWise-0x/homebridge-blink-security/commit/fc53a4fbfa2156dde2a3266378035809e9fa4c56))
+
 ## [1.12.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.3...v1.12.4) (2026-09-04)
 
 ### Bug Fixes
