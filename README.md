@@ -248,6 +248,27 @@ npm run format      # auto-fix formatting
 
 Commits must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary), enforced by pre-commit hooks via [commitlint](https://commitlint.js.org/) and [husky](https://typicode.github.io/husky/).
 
+### Dependency Updates
+
+Dependabot opens grouped pull requests weekly, configured in [`.github/dependabot.yml`](./.github/dependabot.yml). Production and development dependencies are each split into a minor/patch group and a major group. The [Dependabot Auto Merge](./.github/workflows/dependabot-merge.yml) workflow enables auto-merge on patch and minor updates, so they land on their own once CI passes. Major updates stay open for manual review.
+
+`prettier` is excluded from the development group. A Prettier minor can change formatting output, which fails the formatting check and would hold up every other update in the group. It gets its own pull request and usually needs an `npm run format` commit before it merges.
+
+Dependabot only tracks direct dependencies. Advisories against transitive packages, including ones bundled inside another package's tarball (for example `npm`, pulled in by `@semantic-release/npm`), show up as alerts without a pull request. Resolve those by raising the matching floor in the `overrides` block of `package.json` and regenerating the lockfile:
+
+```sh
+npm install --package-lock-only
+npm audit --omit=dev
+```
+
+`npm audit --omit=dev` only covers production dependencies, so a clean result can coexist with open development-scope alerts. Check the repository's Dependabot alerts page for those.
+
+### Releases
+
+Every push to `main` runs [semantic-release](https://semantic-release.gitbook.io/) with the `conventionalcommits` preset. `feat` commits cut a minor release, `fix` and `perf` a patch, and a `BREAKING CHANGE` footer a major. Other types (`docs`, `chore`, `ci`, `build`, `style`, `refactor`, `test`) do not release. Each release updates `CHANGELOG.md`, tags the commit, publishes to npm, and creates a GitHub release.
+
+Publishing requires the `NPM_TOKEN` repository secret to hold a valid npm automation token. If the Release workflow fails with `EINVALIDNPMTOKEN`, generate a new token, update the secret, and re-run the failed job.
+
 <br>
 
 ## Troubleshooting

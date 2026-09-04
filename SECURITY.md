@@ -26,3 +26,7 @@ Please include as much of the information listed below as you can to help me bet
 - Step-by-step instructions to reproduce the issue
 - Proof-of-concept or exploit code (if possible)
 - Impact of the issue, including how an attacker might exploit the issue
+
+## Dependency Advisories
+
+Dependabot alerts on this repository are triaged by scope. Advisories against production dependencies affect the published plugin and are fixed and released as a priority. Advisories against development-only dependencies (the build, lint, and release toolchain) never ship to users; they are still resolved, usually by raising the matching floor in the `overrides` block of `package.json`, but they are not treated as plugin vulnerabilities. See [Dependency Updates](README.md#dependency-updates) for the mechanics.

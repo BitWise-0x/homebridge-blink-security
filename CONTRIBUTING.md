@@ -26,6 +26,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 - [Improving The Documentation](#improving-the-documentation)
 - [Styleguides](#styleguides)
 - [Commit Messages](#commit-messages)
+- [Dependencies](#dependencies)
 - [Join The Project Team](#join-the-project-team)
 
 ## Code of Conduct
@@ -158,6 +159,10 @@ The code style is defined by [.prettierrc.json](.prettierrc.json) and [eslint.co
 ### Commit Messages
 
 Commits must follow the [Conventional Commits standard](https://www.conventionalcommits.org/en/v1.0.0/#summary). This will be enforced by the CI/CD pipeline as well as pre-commit hooks.
+
+### Dependencies
+
+Dependency bumps are handled by Dependabot, with auto-merge for patch and minor updates and manual review for majors. Before bumping a version by hand or editing the `overrides` block in `package.json`, read [Dependency Updates](README.md#dependency-updates) in the README.
 
 <!-- omit in toc -->
 
