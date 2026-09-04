@@ -250,7 +250,7 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/e
 
 ### Dependency Updates
 
-Dependabot opens grouped pull requests weekly, configured in [`.github/dependabot.yml`](./.github/dependabot.yml). Production and development dependencies are each split into a minor/patch group and a major group. The [Dependabot Auto Merge](./.github/workflows/dependabot-merge.yml) workflow enables auto-merge on patch and minor updates, so they land on their own once CI passes. Major updates stay open for manual review.
+Dependabot opens grouped pull requests weekly, configured in [`.github/dependabot.yml`](./.github/dependabot.yml). Production and development dependencies are each split into a minor/patch group and a major group. The [Dependabot Auto Merge](./.github/workflows/dependabot-merge.yml) workflow enables auto-merge on patch and minor updates, so they land on their own once CI passes. Major updates stay open for manual review. Auto-merge is enabled with the `GH_TOKEN` secret rather than the workflow's own `GITHUB_TOKEN`: merges made with `GITHUB_TOKEN` do not trigger push workflows, so the merged commit would land on `main` without Build or Release running.
 
 `prettier` is excluded from the development group. A Prettier minor can change formatting output, which fails the formatting check and would hold up every other update in the group. It gets its own pull request and usually needs an `npm run format` commit before it merges.
 
@@ -267,7 +267,7 @@ npm audit --omit=dev
 
 Every push to `main` runs [semantic-release](https://semantic-release.gitbook.io/) with the `conventionalcommits` preset. `feat` commits cut a minor release, `fix` and `perf` a patch, and a `BREAKING CHANGE` footer a major. Other types (`docs`, `chore`, `ci`, `build`, `style`, `refactor`, `test`) do not release. Each release updates `CHANGELOG.md`, tags the commit, publishes to npm, and creates a GitHub release.
 
-Publishing requires the `NPM_TOKEN` repository secret to hold a valid npm automation token. If the Release workflow fails with `EINVALIDNPMTOKEN`, generate a new token, update the secret, and re-run the failed job.
+Publishing requires two repository secrets: `NPM_TOKEN`, a valid npm automation token, and `GH_TOKEN`, a personal access token with contents and pull-requests write access that semantic-release uses to push the changelog commit and tag and to create the GitHub release (the Dependabot auto-merge workflow uses the same token). If the Release workflow fails with `EINVALIDNPMTOKEN`, generate a new npm token, update the secret, and re-run the failed job. `EINVALIDGHTOKEN` means the same for `GH_TOKEN`. A run that stops with "local branch main is behind the remote one" published nothing; it happens when another commit reaches `main` mid-run, and the next successful run picks up every unreleased commit.
 
 <br>
 
