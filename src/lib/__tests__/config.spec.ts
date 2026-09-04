@@ -320,6 +320,13 @@ describe('normalizeConfig', () => {
       const opts = normalizeConfig(makeConfig({ 'audio-filter': '   ' }));
       expect(opts.audioFilter).toBe('');
     });
+
+    it('ignores a non-string audio-filter', () => {
+      const opts = normalizeConfig(
+        makeConfig({ 'audio-filter': 2 as unknown as string })
+      );
+      expect(opts.audioFilter).toBe('');
+    });
   });
 
   describe('local-storage-motion', () => {

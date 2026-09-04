@@ -138,7 +138,10 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
   checkBoolean('enable-startup-diagnostic', 'startupDiagnostic');
   checkBoolean('enable-audio', 'enableAudio');
 
-  const audioFilter = config['audio-filter']?.trim();
+  const audioFilter =
+    typeof config['audio-filter'] === 'string'
+      ? config['audio-filter'].trim()
+      : '';
   if (audioFilter) {
     opts.audioFilter = audioFilter;
   }
