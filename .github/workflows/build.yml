@@ -1,6 +1,13 @@
 name: Build and Lint
 
-on: [push, pull_request]
+# Pull requests already run on pull_request; limiting push to the release
+# branches stops every Dependabot branch from running the matrix twice.
+on:
+  push:
+    branches:
+      - main
+      - beta
+  pull_request:
 
 jobs:
   build:
@@ -20,7 +27,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        run: npm install
+        run: npm clean-install
 
       - name: Check formatting
         run: npm run prettier
@@ -33,11 +40,3 @@ jobs:
 
       - name: Build the project
         run: npm run build
-
-      - name: List, audit, fix outdated dependencies and build again
-        run: |
-          npm list --outdated
-          npm audit || true  # ignore failures
-          npm audit fix || true
-          npm list --outdated
-          npm run build
