@@ -296,6 +296,37 @@ describe('normalizeConfig', () => {
       const opts = normalizeConfig(makeConfig({}));
       expect(opts.enableAudio).toBe(false);
     });
+
+    it('maps audio-filter to audioFilter', () => {
+      const opts = normalizeConfig(
+        makeConfig({ 'audio-filter': 'volume=2.0' })
+      );
+      expect(opts.audioFilter).toBe('volume=2.0');
+    });
+
+    it('trims whitespace around audio-filter', () => {
+      const opts = normalizeConfig(
+        makeConfig({ 'audio-filter': '  volume=2.0  ' })
+      );
+      expect(opts.audioFilter).toBe('volume=2.0');
+    });
+
+    it('defaults audioFilter to an empty string', () => {
+      const opts = normalizeConfig(makeConfig({}));
+      expect(opts.audioFilter).toBe('');
+    });
+
+    it('ignores a blank audio-filter', () => {
+      const opts = normalizeConfig(makeConfig({ 'audio-filter': '   ' }));
+      expect(opts.audioFilter).toBe('');
+    });
+
+    it('ignores a non-string audio-filter', () => {
+      const opts = normalizeConfig(
+        makeConfig({ 'audio-filter': 2 as unknown as string })
+      );
+      expect(opts.audioFilter).toBe('');
+    });
   });
 
   describe('local-storage-motion', () => {

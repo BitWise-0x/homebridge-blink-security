@@ -149,7 +149,8 @@ export class DoorbellAccessory {
       this.hap,
       this.config.liveView,
       this.config.enableAudio,
-      this.config.hideRoutineLogs
+      this.config.hideRoutineLogs,
+      this.config.audioFilter
     );
 
     const controllerOptions: CameraControllerOptions = {
