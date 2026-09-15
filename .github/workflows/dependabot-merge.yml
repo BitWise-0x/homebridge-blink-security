@@ -15,14 +15,16 @@ jobs:
         uses: dependabot/fetch-metadata@v3
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
-      - name: Enable auto-merge for Dependabot PRs
-        # Only the minor/patch groups are named here on purpose: a major group
-        # with an empty update-type must never fall through to auto-merge.
+      - name: Enable auto-merge for patch and minor Dependabot PRs
+        # Gate on update-type alone. fetch-metadata@v3 sets update-type to the
+        # highest semver change in the PR, group PRs included, so a group that
+        # carries any major reports semver-major and is held for a manual merge.
+        # The dependency-group clauses were the fallback for an older metadata
+        # action that left update-type empty on group PRs; dropping them means
+        # an empty update-type now holds instead of auto-merging (fail closed).
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
-          steps.metadata.outputs.dependency-group == 'production-dependencies' ||
-          steps.metadata.outputs.dependency-group == 'development-dependencies'
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
         run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
