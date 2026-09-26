@@ -15,6 +15,12 @@ jobs:
         uses: dependabot/fetch-metadata@v3
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Mint App token
+        id: apptoken
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
       - name: Enable auto-merge for patch and minor Dependabot PRs
         # Gate on update-type alone. fetch-metadata@v3 sets update-type to the
         # highest semver change in the PR, group PRs included, so a group that
@@ -30,4 +36,5 @@ jobs:
           PR_URL: ${{github.event.pull_request.html_url}}
           # Merges made with GITHUB_TOKEN do not trigger push workflows, so the
           # merged commit would land on main without Build or Release running.
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # The bitwise-ci App token triggers them (App is on the ruleset bypass).
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
