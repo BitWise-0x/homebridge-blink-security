@@ -26,9 +26,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22.x
-          cache: npm
-      # Node 22 bundles npm 10, which rejects lockfiles Dependabot writes with
-      # npm 11. See build.yml.
+          # The npm cache lookup would run Node 22's npm 10, which devEngines
+          # rejects. See build.yml.
+          package-manager-cache: false
+      # package.json requires npm 11 through devEngines. See build.yml.
       - name: Upgrade npm
         run: npm install -g npm@11
       - name: Install dependencies
