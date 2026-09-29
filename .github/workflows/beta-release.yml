@@ -27,6 +27,10 @@ jobs:
         with:
           node-version: 22.x
           cache: npm
+      # Node 22 bundles npm 10, which rejects lockfiles Dependabot writes with
+      # npm 11. See build.yml.
+      - name: Upgrade npm
+        run: npm install -g npm@11
       - name: Install dependencies
         run: npm clean-install
       - name: Check formatting

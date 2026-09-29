@@ -26,6 +26,12 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      # Dependabot writes lockfiles with npm 11, which leaves uninstalled optional
+      # peers out. The npm 10 bundled with Node 20 and 22 reports those lockfiles
+      # as out of sync, so every leg installs with npm 11.
+      - name: Upgrade npm
+        run: npm install -g npm@11
+
       - name: Install dependencies
         run: npm clean-install
 
