@@ -215,7 +215,7 @@ Blink requires two-factor authentication on first login:
 
 ### Prerequisites
 
-- Node.js 18.20.4+, 20.18.0+, 22.10.0+, or 24.0.0+
+- Node.js 22.10.0+ or 24.0.0+
 - Homebridge 1.8.0+ or 2.0.0-beta+
 
 FFmpeg is bundled via the [`ffmpeg-for-homebridge`](https://github.com/homebridge/ffmpeg-for-homebridge) dependency. No separate install is needed, and it ships with `libfdk_aac` enabled for AAC-ELD audio.
