@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.13.0...v2.0.0) (2026-09-29)
+
+### ⚠ BREAKING CHANGES
+
+* requires Node.js 22.10.0+ or 24.0.0+. Node 18 and 20 are no longer supported.
+
+### Features
+
+* drop Node 18 and 20 support ([0672cb8](https://github.com/BitWise-0x/homebridge-blink-security/commit/0672cb8908fe3c91c1b3651015f09564730c7a37))
+
 ## [1.13.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.12.5...v1.13.0) (2026-09-04)
 
 ### Features
