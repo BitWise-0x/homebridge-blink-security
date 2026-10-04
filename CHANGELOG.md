@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.1...v2.0.2) (2026-10-04)
+
+### Bug Fixes
+
+* **deps:** bump fast-uri from 4.1.4 to 4.2.1 ([b6363ff](https://github.com/BitWise-0x/homebridge-blink-security/commit/b6363ff8ee39ed261100a51ef62d8a745ac00086))
+* **deps:** bump undici ([513ac72](https://github.com/BitWise-0x/homebridge-blink-security/commit/513ac724029d2f51f2a863a45829f7e553348e8f))
+
 ## [2.0.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.0...v2.0.1) (2026-10-04)
 
 ### Bug Fixes
