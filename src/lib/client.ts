@@ -20,6 +20,17 @@ const TOKEN_WAIT_WARN_MS = 1000;
 // Well under the 30s axios timeout so a stall is visible before it trips.
 const SLOW_REQUEST_WARN_MS = 5000;
 
+/** A response Blink answered with an error status, after any retries. */
+export class BlinkHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = 'BlinkHttpError';
+  }
+}
+
 export class BlinkClient {
   private readonly authClient: BlinkAuthClient;
   private readonly log: Logger;
@@ -77,9 +88,25 @@ export class BlinkClient {
     return path;
   }
 
-  async get<T = unknown>(path: string, maxTTL = 1): Promise<T> {
+  /**
+   * `expectedStatuses` are error statuses the caller treats as an answer
+   * rather than a fault, e.g. probing whether a resource exists. They still
+   * reject with a BlinkHttpError, but are not logged as errors.
+   */
+  async get<T = unknown>(
+    path: string,
+    maxTTL = 1,
+    expectedStatuses: readonly number[] = []
+  ): Promise<T> {
     if (maxTTL <= 0) {
-      return this._request<T>('GET', path, undefined, maxTTL);
+      return this._request<T>(
+        'GET',
+        path,
+        undefined,
+        maxTTL,
+        0,
+        expectedStatuses
+      );
     }
 
     // Deduplicate concurrent identical GETs: the result cache only stores
@@ -93,11 +120,16 @@ export class BlinkClient {
       return pending as Promise<T>;
     }
 
-    const request = this._request<T>('GET', path, undefined, maxTTL).finally(
-      () => {
-        this.inflight.delete(key);
-      }
-    );
+    const request = this._request<T>(
+      'GET',
+      path,
+      undefined,
+      maxTTL,
+      0,
+      expectedStatuses
+    ).finally(() => {
+      this.inflight.delete(key);
+    });
     this.inflight.set(key, request);
     return request;
   }
@@ -111,7 +143,8 @@ export class BlinkClient {
     path: string,
     body?: unknown,
     maxTTL = 0,
-    retryCount = 0
+    retryCount = 0,
+    expectedStatuses: readonly number[] = []
   ): Promise<T> {
     const resolvedPath = this.resolvePath(path);
     const cacheKey = `${method}:${resolvedPath}`;
@@ -166,7 +199,14 @@ export class BlinkClient {
         if (retryCount < 2) {
           const backoffMs = Math.pow(2, retryCount) * 1000;
           await sleep(backoffMs);
-          return this._request<T>(method, path, body, maxTTL, retryCount + 1);
+          return this._request<T>(
+            method,
+            path,
+            body,
+            maxTTL,
+            retryCount + 1,
+            expectedStatuses
+          );
         }
       }
       throw err;
@@ -184,7 +224,14 @@ export class BlinkClient {
         );
         throw new Error(`Unauthorized: ${res.status}`);
       }
-      return this._request<T>(method, path, body, maxTTL, retryCount + 1);
+      return this._request<T>(
+        method,
+        path,
+        body,
+        maxTTL,
+        retryCount + 1,
+        expectedStatuses
+      );
     }
 
     if (res.status === 401) {
@@ -201,7 +248,14 @@ export class BlinkClient {
         `RETRY: ${method} ${resolvedPath} (${res.status} ${res.statusText}) — retrying in ${backoffMs}ms`
       );
       await sleep(backoffMs);
-      return this._request<T>(method, path, body, maxTTL, retryCount + 1);
+      return this._request<T>(
+        method,
+        path,
+        body,
+        maxTTL,
+        retryCount + 1,
+        expectedStatuses
+      );
     }
 
     // 429 — exponential backoff retry
@@ -211,19 +265,35 @@ export class BlinkClient {
         `RETRY: ${method} ${resolvedPath} (${res.status} Rate limited) — retrying in ${backoffMs}ms`
       );
       await sleep(backoffMs);
-      return this._request<T>(method, path, body, maxTTL, retryCount + 1);
+      return this._request<T>(
+        method,
+        path,
+        body,
+        maxTTL,
+        retryCount + 1,
+        expectedStatuses
+      );
     }
 
     // 409 — busy (command in progress)
     if (res.status === 409) {
       if (!/busy/i.test(res.data?.message ?? '')) {
-        throw new Error(`${method} ${resolvedPath} (${res.status})`);
+        throw new BlinkHttpError(
+          `${method} ${resolvedPath} (${res.status})`,
+          res.status
+        );
       }
     } else if (res.status >= 400) {
-      this.log.error(
-        `${method} ${resolvedPath} (${res.status} ${res.statusText})`
+      const line = `${method} ${resolvedPath} (${res.status} ${res.statusText})`;
+      if (expectedStatuses.includes(res.status)) {
+        this.log.debug(line);
+      } else {
+        this.log.error(line);
+      }
+      throw new BlinkHttpError(
+        `${method} ${resolvedPath} (${res.status})`,
+        res.status
       );
-      throw new Error(`${method} ${resolvedPath} (${res.status})`);
     }
 
     if (method === 'GET' && res.status === 200) {

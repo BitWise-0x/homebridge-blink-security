@@ -26,7 +26,7 @@ vi.mock('../utils.js', () => ({
   sleep: vi.fn(() => Promise.resolve()),
 }));
 
-import { BlinkClient } from '../client.js';
+import { BlinkClient, BlinkHttpError } from '../client.js';
 import type { BlinkAuthClient } from '../auth.js';
 import type { Logger } from 'homebridge';
 
@@ -337,6 +337,41 @@ describe('BlinkClient', () => {
       });
 
       await expect(client.get('/test', 0)).rejects.toThrow('409');
+    });
+  });
+
+  describe('error statuses', () => {
+    const badRequest = { status: 400, statusText: 'Bad Request', data: {} };
+
+    it('rejects with the status and logs an error', async () => {
+      mockRequest.mockResolvedValueOnce(badRequest);
+
+      const err: unknown = await client.get('/test', 0).catch(e => e);
+
+      expect(err).toBeInstanceOf(BlinkHttpError);
+      expect((err as BlinkHttpError).status).toBe(400);
+      expect(log.error).toHaveBeenCalledWith('GET /test (400 Bad Request)');
+    });
+
+    it('does not log an expected status as an error', async () => {
+      mockRequest.mockResolvedValueOnce(badRequest);
+
+      const err: unknown = await client.get('/test', 0, [400]).catch(e => e);
+
+      expect(err).toBeInstanceOf(BlinkHttpError);
+      expect(log.error).not.toHaveBeenCalled();
+    });
+
+    it('still logs a status the caller did not expect', async () => {
+      mockRequest.mockResolvedValueOnce({
+        status: 403,
+        statusText: 'Forbidden',
+        data: {},
+      });
+
+      await client.get('/test', 0, [400]).catch(e => e);
+
+      expect(log.error).toHaveBeenCalledWith('GET /test (403 Forbidden)');
     });
   });
 

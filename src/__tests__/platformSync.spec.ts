@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BlinkSecurityPlatform } from '../platform.js';
 import type {
   API,
@@ -112,6 +112,8 @@ const config = {
  * Substitutes lightweight accessory doubles for the real HAP-backed ones so
  * the reconcile logic is what is under test.
  */
+const GRACE_MS = 5 * 60 * 1000;
+
 class TestPlatform extends BlinkSecurityPlatform {
   private make(device: { canonicalID: string; name: string }) {
     const uuid = `uuid-${device.canonicalID}`;
@@ -149,9 +151,20 @@ describe('BlinkSecurityPlatform accessory sync', () => {
   let platform: BlinkSecurityPlatform;
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
     harness = makeApi();
     platform = new TestPlatform(makeLogger(), config, harness.api);
   });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Let the removal grace period pass, then reconcile again. */
+  function syncAfterGrace() {
+    vi.setSystemTime(Date.now() + GRACE_MS);
+    sync();
+  }
 
   function cameras(...ids: number[]) {
     return new Map(
@@ -179,6 +192,7 @@ describe('BlinkSecurityPlatform accessory sync', () => {
       cameras: cameras(...cameraIds),
       doorbells: new Map(),
       sirens: new Map(),
+      unresolvedDevices: new Set<string>(),
     };
   }
 
@@ -232,16 +246,64 @@ describe('BlinkSecurityPlatform accessory sync', () => {
     expect(accessories[0].platformAccessory).toBe(first);
   });
 
-  it('unregisters an accessory whose device disappeared', () => {
+  // One response that leaves a device out is not proof it was removed.
+  // Blink has to keep omitting it, while still listing others of its kind.
+  it('unregisters an accessory once its device stays gone', () => {
     setBlink([1, 2]);
     sync();
     harness.registered.length = 0;
 
     setBlink([1]);
     sync();
+    expect(harness.unregistered).toHaveLength(0);
+
+    syncAfterGrace();
 
     const removed = harness.unregistered.flat().map(a => a.displayName);
     expect(removed).toEqual(['Blink Cam 2']);
+  });
+
+  it('keeps an accessory whose device comes back in time', () => {
+    setBlink([1, 2]);
+    sync();
+    harness.registered.length = 0;
+
+    setBlink([1]);
+    sync();
+    setBlink([1, 2]);
+    sync();
+    syncAfterGrace();
+
+    expect(harness.unregistered).toHaveLength(0);
+    expect(harness.registered).toHaveLength(0);
+  });
+
+  it('restarts the grace period when a device goes missing again', () => {
+    setBlink([1, 2]);
+    sync();
+    setBlink([1]);
+    sync();
+    setBlink([1, 2]);
+    sync();
+
+    vi.setSystemTime(Date.now() + GRACE_MS);
+    setBlink([1]);
+    sync();
+
+    expect(harness.unregistered).toHaveLength(0);
+  });
+
+  it('asks for a reconcile once a removal comes due', () => {
+    const due = () =>
+      (platform as unknown as { removalDue: () => boolean }).removalDue();
+    setBlink([1, 2]);
+    sync();
+    setBlink([1]);
+    sync();
+    expect(due()).toBe(false);
+
+    vi.setSystemTime(Date.now() + GRACE_MS);
+    expect(due()).toBe(true);
   });
 
   // A removed accessory's delegate still owns ffmpeg children and proxy
@@ -297,6 +359,7 @@ describe('BlinkSecurityPlatform accessory sync', () => {
     sync();
     setBlink([2]);
     sync();
+    syncAfterGrace();
     harness.registered.length = 0;
 
     setBlink([1, 2]);
@@ -392,30 +455,179 @@ describe('BlinkSecurityPlatform accessory rebuild safety', () => {
     }
 
     const platform = new RealisticPlatform(makeLogger(), config, harness.api);
-    const cameras = new Map([
-      [1, { canonicalID: 'Blink:Network:100:Camera:1', name: 'Cam 1' }],
-    ]);
-    (platform as unknown as { blink: unknown }).blink = {
-      networks: new Map(),
-      cameras,
-      doorbells: new Map(),
-      sirens: new Map(),
+    const camera = (id: number) =>
+      [
+        id,
+        { canonicalID: `Blink:Network:100:Camera:${id}`, name: `Cam ${id}` },
+      ] as const;
+    const setCameras = (...ids: number[]) => {
+      (platform as unknown as { blink: unknown }).blink = {
+        networks: new Map(),
+        cameras: new Map(ids.map(camera)),
+        doorbells: new Map(),
+        sirens: new Map(),
+        unresolvedDevices: new Set<string>(),
+      };
     };
     const sync = () =>
       (
         platform as unknown as { syncAccessories: () => void }
       ).syncAccessories();
-    const cfg = (platform as unknown as { config: Record<string, unknown> })
-      .config;
 
+    setCameras(1, 2);
     sync();
-    // Hiding cameras drops the wrapper, so the next pass rebuilds against
-    // the same recycled PlatformAccessory.
-    cfg.noCameras = true;
+    // A device that drops out and returns inside the grace period loses its
+    // wrapper, so the next pass rebuilds against the same recycled
+    // PlatformAccessory.
+    setCameras(2);
     sync();
-    cfg.noCameras = false;
+    setCameras(1, 2);
     sync();
 
-    expect(configured).toEqual(['uuid-Blink:Network:100:Camera:1']);
+    expect(configured).toEqual([
+      'uuid-Blink:Network:100:Camera:1',
+      'uuid-Blink:Network:100:Camera:2',
+    ]);
+  });
+});
+
+// Unregistering discards HomeKit state nothing can restore, so a cached
+// accessory is only given up on evidence that its device is gone.
+describe('BlinkSecurityPlatform cached accessory retention', () => {
+  const visibleDoorbells = {
+    ...config,
+    'hide-doorbells': false,
+  } as unknown as PlatformConfig;
+
+  function cached(canonicalID: string, name: string): PlatformAccessory {
+    return {
+      UUID: `uuid-${canonicalID}`,
+      displayName: `Blink ${name}`,
+      context: { canonicalID },
+    } as unknown as PlatformAccessory;
+  }
+
+  function device(canonicalID: string, name: string) {
+    return { canonicalID, name };
+  }
+
+  function setup(
+    platformConfig: PlatformConfig,
+    restored: PlatformAccessory[]
+  ) {
+    const harness = makeApi();
+    const log = makeLogger();
+    const platform = new TestPlatform(log, platformConfig, harness.api);
+    for (const accessory of restored) {
+      platform.configureAccessory(accessory);
+    }
+    const unresolvedDevices = new Set<string>();
+    const blink = {
+      networks: new Map(),
+      cameras: new Map([[1, device('Blink:Network:100:Camera:1', 'Cam 1')]]),
+      doorbells: new Map<number, unknown>(),
+      sirens: new Map(),
+      unresolvedDevices,
+    };
+    (platform as unknown as { blink: unknown }).blink = blink;
+    const syncPastGrace = () => {
+      const internals = platform as unknown as { syncAccessories: () => void };
+      internals.syncAccessories();
+      vi.setSystemTime(Date.now() + GRACE_MS);
+      internals.syncAccessories();
+    };
+    return { harness, log, platform, blink, syncPastGrace };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const doorbellID = 'Blink:Network:100:Doorbell:9';
+
+  // The #76 analysis case: at startup the first refresh produced cameras but
+  // no doorbell, and the cached doorbell accessory was unregistered.
+  it('keeps a kind of accessory Blink reports none of', () => {
+    const { harness, log, syncPastGrace } = setup(visibleDoorbells, [
+      cached(doorbellID, 'Front Door'),
+    ]);
+
+    syncPastGrace();
+
+    expect(harness.unregistered).toHaveLength(0);
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Blink Front Door')
+    );
+  });
+
+  it('keeps an accessory whose device Blink gave no verdict on', () => {
+    const { harness, blink, syncPastGrace } = setup(visibleDoorbells, [
+      cached(doorbellID, 'Front Door'),
+    ]);
+    blink.doorbells.set(8, device('Blink:Network:100:Doorbell:8', 'Back Door'));
+    blink.unresolvedDevices.add(doorbellID);
+
+    syncPastGrace();
+
+    expect(harness.unregistered).toHaveLength(0);
+  });
+
+  it('removes an accessory Blink keeps leaving out of a kind it reports', () => {
+    const { harness, blink, syncPastGrace } = setup(visibleDoorbells, [
+      cached(doorbellID, 'Front Door'),
+    ]);
+    blink.doorbells.set(8, device('Blink:Network:100:Doorbell:8', 'Back Door'));
+
+    syncPastGrace();
+
+    const removed = harness.unregistered.flat().map(a => a.displayName);
+    expect(removed).toEqual(['Blink Front Door']);
+  });
+
+  it('removes a hidden kind at once', () => {
+    const { harness, platform } = setup(config, [
+      cached(doorbellID, 'Front Door'),
+    ]);
+
+    (platform as unknown as { syncAccessories: () => void }).syncAccessories();
+
+    const removed = harness.unregistered.flat().map(a => a.displayName);
+    expect(removed).toEqual(['Blink Front Door']);
+  });
+
+  it('removes an accessory with no current identity at once', () => {
+    const { harness, platform } = setup(visibleDoorbells, [
+      cached('Blink:Device:100', 'Legacy'),
+    ]);
+
+    (platform as unknown as { syncAccessories: () => void }).syncAccessories();
+
+    const removed = harness.unregistered.flat().map(a => a.displayName);
+    expect(removed).toEqual(['Blink Legacy']);
+  });
+
+  it('hands cached doorbells to the device layer by ID', () => {
+    const { platform } = setup(visibleDoorbells, [
+      cached(doorbellID, 'Front Door'),
+      cached('Blink:Network:100:Camera:1', 'Cam 1'),
+    ]);
+
+    const doorbells = (
+      platform as unknown as { cachedDoorbells: () => unknown[] }
+    ).cachedDoorbells();
+
+    expect(doorbells).toEqual([
+      {
+        id: 9,
+        networkID: 100,
+        canonicalID: doorbellID,
+        displayName: 'Blink Front Door',
+      },
+    ]);
   });
 });

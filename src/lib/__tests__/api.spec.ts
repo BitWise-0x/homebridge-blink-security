@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../client.js', () => {
+vi.mock('../client.js', async importOriginal => {
   class MockBlinkClient {
     get = vi.fn();
     post = vi.fn();
     getUrl = vi.fn();
     getBinary = vi.fn();
   }
-  return { BlinkClient: MockBlinkClient };
+  return {
+    ...(await importOriginal<typeof import('../client.js')>()),
+    BlinkClient: MockBlinkClient,
+  };
 });
 
 vi.mock('../utils.js', () => {
@@ -50,6 +53,7 @@ vi.mock('../utils.js', () => {
 });
 
 import { BlinkApi } from '../api.js';
+import { BlinkHttpError } from '../client.js';
 import type { BlinkAuthClient } from '../auth.js';
 import type { Logger } from 'homebridge';
 
@@ -298,6 +302,43 @@ describe('BlinkApi', () => {
       const result = await api.updateNetworkLvSave(5, false);
       expect(result).toEqual({ id: 1 });
       expect(mockPost).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('probeDoorbellConfig', () => {
+    it('returns the config of a doorbell', async () => {
+      const mockGet = api.client.get as ReturnType<typeof vi.fn>;
+      mockGet.mockResolvedValueOnce({ name: 'Front Doorbell' });
+
+      await expect(api.probeDoorbellConfig(100, 99)).resolves.toEqual({
+        name: 'Front Doorbell',
+      });
+    });
+
+    it.each([400, 404])(
+      'resolves undefined when Blink answers %i',
+      async status => {
+        const mockGet = api.client.get as ReturnType<typeof vi.fn>;
+        mockGet.mockRejectedValueOnce(new BlinkHttpError('refused', status));
+
+        await expect(api.probeDoorbellConfig(100, 99)).resolves.toBeUndefined();
+      }
+    );
+
+    it('rejects on a failure that says nothing about the device', async () => {
+      const mockGet = api.client.get as ReturnType<typeof vi.fn>;
+      mockGet.mockRejectedValueOnce(new BlinkHttpError('down', 503));
+
+      await expect(api.probeDoorbellConfig(100, 99)).rejects.toThrow('down');
+    });
+
+    it('rejects a response that is not an object', async () => {
+      const mockGet = api.client.get as ReturnType<typeof vi.fn>;
+      mockGet.mockResolvedValueOnce('');
+
+      await expect(api.probeDoorbellConfig(100, 99)).rejects.toThrow(
+        'not an object'
+      );
     });
   });
 });

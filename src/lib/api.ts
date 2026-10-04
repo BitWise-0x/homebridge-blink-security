@@ -1,10 +1,15 @@
 import { Logger } from 'homebridge';
 
-import { BlinkClient } from './client.js';
+import { BlinkClient, BlinkHttpError } from './client.js';
 import type { BlinkAuthClient } from './auth.js';
 import { DEFAULT_OPTIONS, type BlinkOptions } from './config.js';
 import { routineInfo } from './logInfo.js';
 import { ExponentialBackoff, sleep } from './utils.js';
+
+// What the doorbell config endpoint answers for an ID that is not a doorbell.
+// 400 is what Blink returned for one in #76; 404 is the same answer for an ID
+// that no longer exists.
+const NOT_A_DOORBELL_STATUSES = [400, 404];
 
 export class BlinkApi {
   readonly client: BlinkClient;
@@ -218,15 +223,43 @@ export class BlinkApi {
     );
   }
 
-  async getDoorbellConfig(
+  /**
+   * Ask Blink whether a device is a doorbell. Resolves undefined when it is
+   * not: that is an answer to the question, not a failure, so it is neither
+   * thrown nor logged as an error. Anything else (network, 5xx, rate limit)
+   * still rejects, and says nothing about the device.
+   */
+  async probeDoorbellConfig(
     networkID: number,
-    doorbellID: number,
+    deviceID: number,
     maxTTL = 3600
-  ): Promise<DoorbellConfigResponse> {
-    return this.client.get<DoorbellConfigResponse>(
-      `/api/v1/accounts/{accountID}/networks/${networkID}/doorbells/${doorbellID}/config`,
-      maxTTL
-    );
+  ): Promise<DoorbellConfigResponse | undefined> {
+    let config: unknown;
+    try {
+      config = await this.client.get<unknown>(
+        `/api/v1/accounts/{accountID}/networks/${networkID}/doorbells/${deviceID}/config`,
+        maxTTL,
+        NOT_A_DOORBELL_STATUSES
+      );
+    } catch (err) {
+      if (
+        err instanceof BlinkHttpError &&
+        NOT_A_DOORBELL_STATUSES.includes(err.status)
+      ) {
+        return undefined;
+      }
+      throw err;
+    }
+    if (
+      typeof config !== 'object' ||
+      config === null ||
+      Array.isArray(config)
+    ) {
+      throw new Error(
+        `Doorbell config for device ${deviceID} is not an object`
+      );
+    }
+    return config as DoorbellConfigResponse;
   }
 
   async updateDoorbellThumbnail(
@@ -632,6 +665,7 @@ export interface MediaEntry {
   device_id: number;
   network_id: number;
   device: string;
+  device_name?: string;
   source?: string;
   thumbnail: string;
   media?: string;

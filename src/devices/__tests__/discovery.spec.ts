@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { Blink } from '../index.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { Blink, DOORBELL_REFUSAL_TTL } from '../index.js';
 import { DEFAULT_OPTIONS } from '../../lib/config.js';
 import type { BlinkAuthClient } from '../../lib/auth.js';
 import type { Logger } from 'homebridge';
@@ -55,7 +55,7 @@ function makeBlink(homescreen: Record<string, unknown>) {
   const api = {
     getAccountHomescreen: vi.fn().mockResolvedValue(homescreen),
     getMediaChange: vi.fn().mockResolvedValue({ media: [] }),
-    getDoorbellConfig: vi.fn().mockResolvedValue({}),
+    probeDoorbellConfig: vi.fn().mockResolvedValue(undefined),
   };
   Object.defineProperty(blink, 'api', { value: api });
   return { blink, api, log };
@@ -203,7 +203,7 @@ describe('Blink.refreshData device discovery', () => {
         },
       ],
     });
-    api.getDoorbellConfig.mockResolvedValue({
+    api.probeDoorbellConfig.mockResolvedValue({
       id: 99,
       network_id: 100,
       name: 'Front Doorbell',
@@ -320,10 +320,9 @@ describe('Blink.refreshData device discovery', () => {
     );
   });
 
-  // The media-based fallback previously matched only the hardcoded "lotus"
-  // codename, so any newer doorbell revision was invisible on accounts whose
-  // homescreen doorbell arrays come back empty.
-  it('discovers a doorbell whose codename is not the known one', async () => {
+  // A doorbell revision with a new codename is still recognizable by its
+  // button presses, which no other device produces.
+  it('discovers a doorbell with an unknown codename from a press', async () => {
     const { blink, api } = makeBlink(makeHomescreen());
     api.getMediaChange.mockResolvedValue({
       media: [
@@ -334,11 +333,12 @@ describe('Blink.refreshData device discovery', () => {
           device_id: 99,
           network_id: 100,
           device: 'orchid',
+          source: 'button_press',
           thumbnail: '',
         },
       ],
     });
-    api.getDoorbellConfig.mockResolvedValue({
+    api.probeDoorbellConfig.mockResolvedValue({
       id: 99,
       network_id: 100,
       name: 'Front Doorbell',
@@ -366,6 +366,274 @@ describe('Blink.refreshData device discovery', () => {
 
     await blink.refreshData();
     expect(blink.doorbells.has(42)).toBe(false);
-    expect(api.getDoorbellConfig).not.toHaveBeenCalled();
+    expect(api.probeDoorbellConfig).not.toHaveBeenCalled();
+  });
+
+  // #76: a device with recent clips that the account does not list (a
+  // removed camera, or one in a group the plugin ignores) was probed as a
+  // doorbell on every poll, and Blink refused every time.
+  describe('with media from a device the account does not list', () => {
+    const clip = (overrides: Record<string, unknown> = {}) => ({
+      media: [
+        {
+          id: 1,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+          device_id: 282709,
+          device_name: 'Old Garage',
+          network_id: 100,
+          device: 'catalina',
+          source: 'pir',
+          thumbnail: '',
+          ...overrides,
+        },
+      ],
+    });
+
+    it('never probes a device with no doorbell evidence', async () => {
+      const { blink, api } = makeBlink(makeHomescreen());
+      api.getMediaChange.mockResolvedValue(clip());
+
+      await blink.refreshData();
+      await blink.refreshData();
+
+      expect(api.probeDoorbellConfig).not.toHaveBeenCalled();
+      expect(blink.doorbells.size).toBe(0);
+    });
+
+    it('names the device once', async () => {
+      const { blink, api, log } = makeBlink(makeHomescreen());
+      api.getMediaChange.mockResolvedValue(clip());
+
+      await blink.refreshData();
+      await blink.refreshData();
+
+      const notes = vi
+        .mocked(log.info)
+        .mock.calls.filter(([msg]) => String(msg).includes('Old Garage'));
+      expect(notes).toHaveLength(1);
+      expect(notes[0][0]).toContain('type catalina, id 282709');
+    });
+
+    it('asks only once about a doorbell-typed device Blink refuses', async () => {
+      const { blink, api } = makeBlink(makeHomescreen());
+      api.getMediaChange.mockResolvedValue(clip({ device: 'lotus' }));
+      api.probeDoorbellConfig.mockResolvedValue(undefined);
+
+      await blink.refreshData();
+      await blink.refreshData();
+
+      expect(api.probeDoorbellConfig).toHaveBeenCalledTimes(1);
+      expect(blink.doorbells.size).toBe(0);
+    });
+
+    it('asks again when the probe failed without an answer', async () => {
+      const { blink, api } = makeBlink(makeHomescreen());
+      api.getMediaChange.mockResolvedValue(clip({ device: 'lotus' }));
+      api.probeDoorbellConfig.mockRejectedValueOnce(new Error('ETIMEDOUT'));
+      api.probeDoorbellConfig.mockResolvedValue({ name: 'Front Doorbell' });
+
+      await blink.refreshData();
+      expect(blink.doorbells.size).toBe(0);
+
+      await blink.refreshData();
+      expect(blink.doorbells.has(282709)).toBe(true);
+    });
+
+    it('does not look for doorbells when they are hidden', async () => {
+      const { blink, api } = makeBlink(makeHomescreen());
+      blink.options.noDoorbells = true;
+      api.getMediaChange.mockResolvedValue(clip({ device: 'lotus' }));
+
+      await blink.refreshData();
+
+      expect(api.probeDoorbellConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  // Doorbells the homescreen does not list used to be rediscovered from the
+  // 24h media window on every start. One with no recent clip, or whose probe
+  // failed once, was missing from the first refresh and lost its accessory.
+  describe('with a doorbell known from the accessory cache', () => {
+    const cachedDoorbell = {
+      id: 99,
+      networkID: 100,
+      canonicalID: 'Blink:Network:100:Doorbell:99',
+      displayName: 'Blink Blink Front Door',
+    };
+    const listedDoorbell = makeDevice(77, 'Back Door', 'lotus');
+
+    function makeSeeded(homescreen = makeHomescreen()) {
+      const made = makeBlink(homescreen);
+      made.blink.seedCachedDoorbells([cachedDoorbell]);
+      return made;
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('finds it without any recent clip', async () => {
+      const { blink, api } = makeSeeded();
+      api.probeDoorbellConfig.mockResolvedValue({ name: 'Front Door' });
+
+      await blink.refreshData();
+
+      expect(api.probeDoorbellConfig).toHaveBeenCalledWith(100, 99, 30);
+      expect(blink.doorbells.get(99)!.data.name).toBe('Front Door');
+      expect(blink.unresolvedDevices.size).toBe(0);
+    });
+
+    it('finds it on an account whose homescreen lists other doorbells', async () => {
+      const { blink, api } = makeSeeded(
+        makeHomescreen({ doorbells: [listedDoorbell] })
+      );
+      api.probeDoorbellConfig.mockResolvedValue({ serial: 'D99' });
+
+      await blink.refreshData();
+
+      expect([...blink.doorbells.keys()].sort()).toEqual([77, 99]);
+    });
+
+    it('leaves it unresolved when the request fails, and asks again', async () => {
+      const { blink, api } = makeSeeded();
+      api.probeDoorbellConfig.mockRejectedValueOnce(new Error('ETIMEDOUT'));
+      api.probeDoorbellConfig.mockResolvedValue({ serial: 'D99' });
+
+      await blink.refreshData();
+      expect(blink.doorbells.has(99)).toBe(false);
+      expect([...blink.unresolvedDevices]).toEqual([
+        cachedDoorbell.canonicalID,
+      ]);
+
+      await blink.refreshData();
+      expect(blink.doorbells.has(99)).toBe(true);
+      expect(blink.unresolvedDevices.size).toBe(0);
+    });
+
+    // A refusal on its own is not proof of removal: nothing documents what
+    // Blink answers for a doorbell that still exists but cannot be served.
+    it('leaves it unresolved when Blink refuses and lists no doorbells', async () => {
+      const { blink, api, log } = makeSeeded();
+      api.probeDoorbellConfig.mockResolvedValue(undefined);
+
+      await blink.refreshData();
+      await blink.refreshData();
+
+      expect([...blink.unresolvedDevices]).toEqual([
+        cachedDoorbell.canonicalID,
+      ]);
+      expect(api.probeDoorbellConfig).toHaveBeenCalledTimes(1);
+      const warnings = vi
+        .mocked(log.warn)
+        .mock.calls.filter(([msg]) => String(msg).includes('Front Door'));
+      expect(warnings).toHaveLength(1);
+    });
+
+    it('asks a refused doorbell again once the refusal is stale', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const { blink, api } = makeSeeded();
+      api.probeDoorbellConfig.mockResolvedValueOnce(undefined);
+      api.probeDoorbellConfig.mockResolvedValue({ serial: 'D99' });
+
+      await blink.refreshData();
+      vi.setSystemTime(Date.now() + DOORBELL_REFUSAL_TTL * 1000);
+      await blink.refreshData();
+
+      expect(blink.doorbells.has(99)).toBe(true);
+    });
+
+    it('gives it up when Blink refuses and lists other doorbells', async () => {
+      const { blink, api } = makeSeeded(
+        makeHomescreen({ doorbells: [listedDoorbell] })
+      );
+      api.probeDoorbellConfig.mockResolvedValue(undefined);
+
+      await blink.refreshData();
+
+      expect(blink.doorbells.has(99)).toBe(false);
+      expect(blink.unresolvedDevices.size).toBe(0);
+    });
+
+    it('is left alone when doorbells are hidden', async () => {
+      const { blink, api } = makeSeeded();
+      blink.options.noDoorbells = true;
+
+      await blink.refreshData();
+
+      expect(api.probeDoorbellConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('with a doorbell found earlier in the session', () => {
+    const lotusClip = {
+      media: [
+        {
+          id: 1,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+          device_id: 99,
+          network_id: 100,
+          device: 'lotus',
+          thumbnail: '',
+        },
+      ],
+    };
+
+    async function makeDiscovered() {
+      const made = makeBlink(makeHomescreen());
+      made.api.getMediaChange.mockResolvedValue(lotusClip);
+      made.api.probeDoorbellConfig.mockResolvedValue({ name: 'Front Door' });
+      await made.blink.refreshData();
+      return made;
+    }
+
+    it('keeps it after its clips leave the media window', async () => {
+      const { blink, api } = await makeDiscovered();
+      api.getMediaChange.mockResolvedValue({ media: [] });
+
+      await blink.refreshData();
+
+      expect(blink.doorbells.has(99)).toBe(true);
+    });
+
+    it('keeps it, and says so once, when Blink refuses it', async () => {
+      const { blink, api, log } = await makeDiscovered();
+      api.probeDoorbellConfig.mockResolvedValue(undefined);
+
+      await blink.refreshData();
+      await blink.refreshData();
+
+      expect(blink.doorbells.has(99)).toBe(true);
+      expect(api.probeDoorbellConfig).toHaveBeenCalledTimes(2);
+      const warnings = vi
+        .mocked(log.warn)
+        .mock.calls.filter(([msg]) => String(msg).includes('Front Door'));
+      expect(warnings).toHaveLength(1);
+    });
+
+    it('removes it when Blink refuses it and lists other doorbells', async () => {
+      const { blink, api } = await makeDiscovered();
+      api.getAccountHomescreen.mockResolvedValue(
+        makeHomescreen({ doorbells: [makeDevice(77, 'Back Door', 'lotus')] })
+      );
+      api.probeDoorbellConfig.mockResolvedValue(undefined);
+
+      await blink.refreshData();
+
+      expect([...blink.doorbells.keys()]).toEqual([77]);
+    });
+
+    it('keeps it when the request fails while other doorbells are listed', async () => {
+      const { blink, api } = await makeDiscovered();
+      api.getAccountHomescreen.mockResolvedValue(
+        makeHomescreen({ doorbells: [makeDevice(77, 'Back Door', 'lotus')] })
+      );
+      api.probeDoorbellConfig.mockRejectedValue(new Error('ETIMEDOUT'));
+
+      await blink.refreshData();
+
+      expect([...blink.doorbells.keys()].sort()).toEqual([77, 99]);
+    });
   });
 });

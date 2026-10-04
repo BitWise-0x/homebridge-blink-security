@@ -38,11 +38,25 @@ export const STATUS_POLL = 20;
 export const ARMED_DELAY = 60;
 export const MOTION_TRIGGER_DECAY = 90;
 export const DOORBELL_DEVICE_TYPE = 'lotus';
+// How long a refused doorbell config is taken as the answer before Blink is
+// asked again. A refusal says nothing about how long it holds, so it is
+// neither re-asked on every poll nor trusted for good.
+export const DOORBELL_REFUSAL_TTL = 60 * 60;
 // Local-storage manifest polling is heavier than the cloud media check
 // (command POST + completion polling + manifest GET), so it runs on its own
 // slower cadence than the main refresh loop.
 export const LOCAL_STORAGE_POLL = 20;
 export const LOCAL_STORAGE_STARTUP_DELAY = 90;
+
+/** A doorbell known from the accessory cache rather than from Blink. */
+export interface CachedDoorbell {
+  id: number;
+  networkID: number;
+  canonicalID: string;
+  // For log lines only. It carries the accessory prefixes, so the device's
+  // own name cannot be recovered from it.
+  displayName: string;
+}
 
 export class Blink {
   readonly api: BlinkApi;
@@ -77,6 +91,20 @@ export class Blink {
   // media fallback are absent from it by nature, so their absence must never
   // be read as a removal.
   private readonly homescreenDoorbells = new Set<number>();
+  // Doorbells this install already exposes to HomeKit, from the accessory
+  // cache, that no refresh has accounted for yet. They are asked about by ID
+  // so that keeping them never depends on what the media window happens to
+  // hold at startup.
+  private readonly cachedDoorbells = new Map<number, CachedDoorbell>();
+  // When Blink last refused each device's doorbell config.
+  private readonly doorbellRefusals = new Map<number, number>();
+  /**
+   * Canonical IDs of cached devices Blink has given no usable verdict on.
+   * Their accessories must be kept: nothing says the device is gone.
+   */
+  readonly unresolvedDevices = new Set<string>();
+  // Devices seen in media that the account does not list, already reported.
+  private readonly unlistedMediaDevices = new Set<number>();
   // Last logged cloud media summary, so getMergedMedia only logs when the
   // media list actually changes rather than on every camera every poll.
   private mediaTrace = '';
@@ -196,6 +224,274 @@ export class Blink {
     }
   }
 
+  /**
+   * Report, once, a device that has recent clips but is not on the account's
+   * device list. Usually a camera that was removed while its clips are still
+   * in the media window. Named so a device the plugin fails to list can be
+   * told apart from one that is simply gone.
+   */
+  private noteUnlistedMediaDevice(
+    entry: MediaEntry,
+    knownCameraIds: Set<number>
+  ): void {
+    const id = entry.device_id;
+    if (knownCameraIds.has(id) || this.unlistedMediaDevices.has(id)) {
+      return;
+    }
+    this.unlistedMediaDevices.add(id);
+    this.log.info(
+      `Blink has recent clips from "${entry.device_name ?? 'unnamed'}" ` +
+        `(type ${entry.device}, id ${id}), which is not on the account's ` +
+        'device list. It is ignored.'
+    );
+  }
+
+  /**
+   * Doorbells the accessory cache already holds, handed over before the
+   * first refresh.
+   */
+  seedCachedDoorbells(doorbells: CachedDoorbell[]): void {
+    for (const doorbell of doorbells) {
+      this.cachedDoorbells.set(doorbell.id, doorbell);
+    }
+  }
+
+  /**
+   * Ask Blink for a device's doorbell config. A refusal is remembered for
+   * DOORBELL_REFUSAL_TTL; `unanswered` means the request failed and says
+   * nothing about the device.
+   */
+  private async askDoorbellConfig(
+    networkID: number,
+    id: number,
+    ttl: number
+  ): Promise<Record<string, unknown> | 'refused' | 'unanswered'> {
+    const refusedAt = this.doorbellRefusals.get(id);
+    if (
+      refusedAt !== undefined &&
+      Date.now() - refusedAt < DOORBELL_REFUSAL_TTL * 1000
+    ) {
+      return 'refused';
+    }
+    try {
+      const config = await this.api.probeDoorbellConfig(networkID, id, ttl);
+      if (config) {
+        this.doorbellRefusals.delete(id);
+        return config as unknown as Record<string, unknown>;
+      }
+      this.doorbellRefusals.set(id, Date.now());
+      return 'refused';
+    } catch (err) {
+      this.log.debug(`Failed to fetch config for doorbell ${id}: ${err}`);
+      return 'unanswered';
+    }
+  }
+
+  /**
+   * Build a homescreen-shaped entry for a doorbell the homescreen does not
+   * list. The config endpoint may return fields under different names (e.g.
+   * camera_id instead of id) or nest them, so the ID and network come from
+   * the caller and the config fills in what it provides.
+   */
+  private synthesizeDoorbell(
+    id: number,
+    networkID: number,
+    raw: Record<string, unknown>,
+    fallback: { thumbnail?: string }
+  ): HomescreenCamera {
+    return {
+      id: (raw.id as number) ?? id,
+      network_id: (raw.network_id as number) ?? networkID,
+      name: (raw.name as string) ?? `Doorbell ${id}`,
+      serial: (raw.serial as string) ?? '',
+      fw_version: (raw.fw_version as string) ?? '',
+      type: (raw.type as string) ?? DOORBELL_DEVICE_TYPE,
+      enabled: (raw.enabled as boolean) ?? true,
+      thumbnail: (raw.thumbnail as string) ?? fallback.thumbnail ?? '',
+      status: (raw.status as string) ?? 'online',
+      battery: raw.battery as string | undefined,
+      signals: raw.signals as HomescreenCamera['signals'],
+      created_at: (raw.created_at as string) ?? new Date().toISOString(),
+      updated_at: (raw.updated_at as string) ?? new Date().toISOString(),
+    };
+  }
+
+  /** Fold a fresh config into a doorbell that is already tracked. */
+  private async refreshedDoorbell(
+    doorbell: BlinkDoorbell,
+    raw: Record<string, unknown>
+  ): Promise<HomescreenCamera> {
+    const current = doorbell.data;
+
+    // Use thumbnail from config if available, otherwise check recent
+    // media for a newer one (e.g. after a post-stream thumbnail refresh).
+    let thumbnail = (raw.thumbnail as string) || current.thumbnail;
+    const lastMedia = await this.getCameraLastMotion(
+      doorbell.networkID,
+      doorbell.cameraID
+    ).catch(() => undefined);
+    if (lastMedia?.thumbnail) {
+      const mediaTime = Date.parse(lastMedia.created_at) || 0;
+      if (mediaTime > doorbell.thumbnailCreatedAt || !thumbnail) {
+        thumbnail = lastMedia.thumbnail;
+      }
+    }
+
+    // Preserve synthesized id/network_id, update other fields
+    return {
+      ...current,
+      name: (raw.name as string) ?? current.name,
+      serial: (raw.serial as string) ?? current.serial,
+      fw_version: (raw.fw_version as string) ?? current.fw_version,
+      enabled: (raw.enabled as boolean) ?? current.enabled,
+      status: (raw.status as string) ?? current.status,
+      battery: raw.battery as string | undefined,
+      thumbnail,
+      updated_at: (raw.updated_at as string) ?? current.updated_at,
+    };
+  }
+
+  /**
+   * Settle every doorbell that is already known (tracked this session, or
+   * held in the accessory cache) but that the homescreen does not list, by
+   * asking Blink for it by ID.
+   *
+   * A known doorbell is only given up on corroborated evidence: Blink
+   * refuses its config AND the homescreen is listing other doorbells
+   * without it. A refusal alone, a failed request, or an empty homescreen
+   * list all keep it, because unregistering discards HomeKit state that no
+   * later poll can restore.
+   */
+  private async resolveKnownDoorbells(
+    listedIds: Set<number>,
+    ttl: number
+  ): Promise<HomescreenCamera[]> {
+    const known: (CachedDoorbell & { device?: BlinkDoorbell })[] = [];
+    for (const [id, cached] of this.cachedDoorbells) {
+      if (listedIds.has(id) || this.doorbells.has(id)) {
+        this.cachedDoorbells.delete(id);
+      } else {
+        known.push(cached);
+      }
+    }
+    for (const [id, device] of this.doorbells) {
+      // A doorbell the homescreen used to list and now omits, while still
+      // listing others, is removed on that list by pruneRemovedDevices.
+      const droppedFromList =
+        this.homescreenDoorbells.has(id) && listedIds.size > 0;
+      if (!listedIds.has(id) && !droppedFromList) {
+        known.push({
+          id,
+          networkID: device.networkID,
+          canonicalID: device.canonicalID,
+          displayName: device.name,
+          device,
+        });
+      }
+    }
+
+    this.unresolvedDevices.clear();
+    const resolved: HomescreenCamera[] = [];
+    for (const { id, networkID, canonicalID, displayName, device } of known) {
+      const firstRefusal = !this.doorbellRefusals.has(id);
+      const answer = await this.askDoorbellConfig(networkID, id, ttl);
+
+      if (typeof answer === 'object') {
+        resolved.push(
+          device
+            ? await this.refreshedDoorbell(device, answer)
+            : this.synthesizeDoorbell(id, networkID, answer, {})
+        );
+        continue;
+      }
+
+      if (answer === 'refused' && listedIds.size > 0) {
+        this.cachedDoorbells.delete(id);
+        if (device) {
+          this.doorbells.delete(id);
+          this.localMedia.delete(id);
+        }
+        this.log.info(
+          `Doorbell "${displayName}" is no longer on the account and was ` +
+            'removed'
+        );
+        continue;
+      }
+
+      if (answer === 'refused' && firstRefusal) {
+        this.log.warn(
+          `Blink refused the config of doorbell "${displayName}". It is kept in ` +
+            'HomeKit. If it was removed from the Blink account, remove it ' +
+            'from the Homebridge accessory cache.'
+        );
+      }
+      if (device) {
+        resolved.push(device.data);
+      } else {
+        this.unresolvedDevices.add(canonicalID);
+      }
+    }
+    return resolved;
+  }
+
+  /**
+   * Find doorbells the homescreen does not list from recent media.
+   *
+   * A device is only probed on positive evidence that it is a doorbell: the
+   * doorbell codename, or a button press, which nothing else produces.
+   * Being absent from the camera list is not evidence. A removed camera and
+   * the device groups this plugin ignores are absent too, and probing those
+   * asked Blink the same refused question on every poll (#76).
+   */
+  private async discoverDoorbellsFromMedia(
+    allCameras: HomescreenCamera[],
+    ttl: number
+  ): Promise<HomescreenCamera[]> {
+    const mediaRes = await this.api.getMediaChange(ttl).catch(err => {
+      this.log.debug(`Doorbell discovery could not read media: ${err}`);
+      return { media: [] as MediaEntry[] };
+    });
+
+    const knownCameraIds = new Set([
+      ...allCameras.map(c => c.id),
+      ...this.cameras.keys(),
+    ]);
+    const candidates = new Map<number, MediaEntry>();
+    for (const entry of mediaRes.media ?? []) {
+      const id = entry.device_id;
+      // Known doorbells are settled by resolveKnownDoorbells.
+      if (this.doorbells.has(id) || this.cachedDoorbells.has(id)) {
+        continue;
+      }
+      const isCandidate =
+        entry.device === DOORBELL_DEVICE_TYPE ||
+        (entry.source !== undefined &&
+          DOORBELL_PRESS_SOURCES.includes(entry.source));
+      if (!isCandidate) {
+        this.noteUnlistedMediaDevice(entry, knownCameraIds);
+      } else if (!candidates.has(id)) {
+        candidates.set(id, entry);
+      }
+    }
+
+    const discovered: HomescreenCamera[] = [];
+    for (const [id, entry] of candidates) {
+      const answer = await this.askDoorbellConfig(entry.network_id, id, ttl);
+      if (typeof answer !== 'object') {
+        continue;
+      }
+      const doorbell = this.synthesizeDoorbell(id, entry.network_id, answer, {
+        thumbnail: entry.thumbnail,
+      });
+      this.log.info(
+        `Blink doorbell "${doorbell.name}" is not on the account's device ` +
+          'list; it was found through its recent clips'
+      );
+      discovered.push(doorbell);
+    }
+    return discovered;
+  }
+
   /** Announce a device that appeared after startup. */
   private logNewDevice(kind: string, name: string): void {
     this.log.info(`Blink discovered a new ${kind} "${name}"`);
@@ -273,141 +569,32 @@ export class Blink {
       ...owls,
     ];
 
-    let allDoorbells: HomescreenCamera[] = [
+    const listedDoorbells: HomescreenCamera[] = [
       ...(homescreen.doorbells ?? []),
       ...(homescreen.doorbell_buttons ?? []),
     ];
-    // Recorded before the media fallback can substitute its own list, so
-    // pruning knows which doorbells the homescreen is authoritative for.
-    for (const doorbell of allDoorbells) {
+    const listedDoorbellIds = new Set(listedDoorbells.map(d => d.id));
+    // Recorded so pruning knows which doorbells the homescreen is
+    // authoritative for.
+    for (const doorbell of listedDoorbells) {
       this.homescreenDoorbells.add(doorbell.id);
     }
 
-    // Fallback: discover doorbells from recent media when homescreen has none
-    if (allDoorbells.length === 0) {
-      try {
-        const mediaRes = await this.api
-          .getMediaChange(ttl)
-          .catch(() => ({ media: [] }));
-
-        // Any media device type that is not a known camera is a doorbell
-        // candidate; the /doorbells/ config probe below decides. Matching
-        // only the known "lotus" codename would miss every future doorbell
-        // revision the same way #40/#51 missed new camera models.
-        const knownCameraIds = new Set([
-          ...allCameras.map(c => c.id),
-          ...this.cameras.keys(),
-        ]);
-        const doorbellIds = new Map<
-          number,
-          { network_id: number; thumbnail: string }
-        >();
-        for (const entry of mediaRes.media ?? []) {
-          const isCandidate =
-            entry.device === DOORBELL_DEVICE_TYPE ||
-            !knownCameraIds.has(entry.device_id);
-          if (isCandidate && !doorbellIds.has(entry.device_id)) {
-            doorbellIds.set(entry.device_id, {
-              network_id: entry.network_id,
-              thumbnail: entry.thumbnail,
-            });
-          }
-        }
-
-        const fallbackDoorbells: HomescreenCamera[] = [];
-        for (const [deviceId, { network_id, thumbnail }] of doorbellIds) {
-          try {
-            const config = await this.api.getDoorbellConfig(
-              network_id,
-              deviceId,
-              ttl
-            );
-            // The config endpoint may return fields under different names
-            // (e.g. camera_id instead of id) or nest them. Synthesize a
-            // HomescreenCamera using known-good values from the media entry
-            // and fill in what the config provides.
-            const raw = config as unknown as Record<string, unknown>;
-            const doorbell: HomescreenCamera = {
-              id: (raw.id as number) ?? deviceId,
-              network_id: (raw.network_id as number) ?? network_id,
-              name: (raw.name as string) ?? `Doorbell ${deviceId}`,
-              serial: (raw.serial as string) ?? '',
-              fw_version: (raw.fw_version as string) ?? '',
-              type: (raw.type as string) ?? DOORBELL_DEVICE_TYPE,
-              enabled: (raw.enabled as boolean) ?? true,
-              thumbnail: (raw.thumbnail as string) ?? thumbnail ?? '',
-              status: (raw.status as string) ?? 'online',
-              battery: raw.battery as string | undefined,
-              signals: raw.signals as HomescreenCamera['signals'],
-              created_at:
-                (raw.created_at as string) ?? new Date().toISOString(),
-              updated_at:
-                (raw.updated_at as string) ?? new Date().toISOString(),
-            };
-            fallbackDoorbells.push(doorbell);
-          } catch (err) {
-            this.log.debug(
-              `Failed to fetch config for doorbell ${deviceId}: ${err}`
-            );
-          }
-        }
-
-        if (fallbackDoorbells.length > 0) {
-          routineInfo(
-            this.log,
-            this.options,
-            `Blink fallback discovered ${fallbackDoorbells.length} doorbell(s) from recent media.`
-          );
-          allDoorbells = fallbackDoorbells;
-        }
-      } catch (err) {
-        this.log.debug(`Doorbell fallback discovery failed: ${err}`);
-      }
-
-      // Second fallback: if media had no doorbell entries but we already
-      // know about doorbells from a previous session, re-discover them
-      // directly via the config endpoint.
-      if (allDoorbells.length === 0 && this.doorbells.size > 0) {
-        for (const [id, doorbell] of this.doorbells) {
-          try {
-            const config = await this.api.getDoorbellConfig(
-              doorbell.networkID,
-              id,
-              ttl
-            );
-            const raw = config as unknown as Record<string, unknown>;
-            const current = doorbell.data;
-            const entry: HomescreenCamera = {
-              id: current.id,
-              network_id: current.network_id,
-              name: (raw.name as string) ?? current.name,
-              serial: (raw.serial as string) ?? current.serial,
-              fw_version: (raw.fw_version as string) ?? current.fw_version,
-              type: current.type,
-              enabled: (raw.enabled as boolean) ?? current.enabled,
-              thumbnail: (raw.thumbnail as string) ?? current.thumbnail,
-              status: (raw.status as string) ?? current.status,
-              battery: raw.battery as string | undefined,
-              created_at: current.created_at,
-              updated_at: (raw.updated_at as string) ?? current.updated_at,
-            };
-            allDoorbells.push(entry);
-          } catch {
-            // Config fetch failed — keep existing data as-is
-            allDoorbells.push(doorbell.data);
-          }
-        }
-        if (allDoorbells.length > 0) {
-          routineInfo(
-            this.log,
-            this.options,
-            `Blink fallback restored ${allDoorbells.length} doorbell(s) from cached state.`
-          );
-        }
-      }
+    // The homescreen is the authority for the doorbells it lists. Doorbells
+    // it does not list are settled individually, and new ones are only
+    // looked for when it lists none at all. Nothing is looked for when
+    // doorbells are hidden: it would not be exposed.
+    let allDoorbells = listedDoorbells;
+    if (!this.options.noDoorbells) {
+      const known = await this.resolveKnownDoorbells(listedDoorbellIds, ttl);
+      const discovered =
+        listedDoorbells.length === 0
+          ? await this.discoverDoorbellsFromMedia(allCameras, ttl)
+          : [];
+      allDoorbells = [...listedDoorbells, ...known, ...discovered];
     }
 
-    // Exclude fallback-discovered doorbells from camera list to prevent duplicates
+    // Exclude unlisted doorbells from the camera list to prevent duplicates
     const doorbellIdSet = new Set(allDoorbells.map(d => d.id));
     const filteredCameras = allCameras.filter(c => !doorbellIdSet.has(c.id));
 
@@ -453,49 +640,6 @@ export class Blink {
         allDoorbells,
         allSirens
       );
-      // Refresh fallback-discovered doorbells not present in homescreen
-      for (const [id, doorbell] of this.doorbells) {
-        if (!doorbellIdSet.has(id)) {
-          try {
-            const config = await this.api.getDoorbellConfig(
-              doorbell.networkID,
-              id,
-              ttl
-            );
-            const raw = config as unknown as Record<string, unknown>;
-            const current = doorbell.data;
-
-            // Use thumbnail from config if available, otherwise check recent
-            // media for a newer one (e.g. after a post-stream thumbnail refresh).
-            let thumbnail = (raw.thumbnail as string) || current.thumbnail;
-            const lastMedia = await this.getCameraLastMotion(
-              doorbell.networkID,
-              id
-            ).catch(() => undefined);
-            if (lastMedia?.thumbnail) {
-              const mediaTime = Date.parse(lastMedia.created_at) || 0;
-              if (mediaTime > doorbell.thumbnailCreatedAt || !thumbnail) {
-                thumbnail = lastMedia.thumbnail;
-              }
-            }
-
-            // Preserve synthesized id/network_id, update other fields
-            doorbell.data = {
-              ...current,
-              name: (raw.name as string) ?? current.name,
-              serial: (raw.serial as string) ?? current.serial,
-              fw_version: (raw.fw_version as string) ?? current.fw_version,
-              enabled: (raw.enabled as boolean) ?? current.enabled,
-              status: (raw.status as string) ?? current.status,
-              battery: raw.battery as string | undefined,
-              thumbnail,
-              updated_at: (raw.updated_at as string) ?? current.updated_at,
-            };
-          } catch {
-            // Config fetch failed — keep existing data
-          }
-        }
-      }
       for (const s of allSirens) {
         if (this.sirens.has(s.id)) {
           this.sirens.get(s.id)!.data = s;

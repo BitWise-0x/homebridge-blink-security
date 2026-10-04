@@ -21,6 +21,7 @@ import {
   type BlinkDoorbell,
   type BlinkNetwork,
   type BlinkSiren,
+  type CachedDoorbell,
 } from './devices/index.js';
 import { SecuritySystemAccessory } from './accessories/securitySystem.js';
 import { CameraAccessory } from './accessories/camera.js';
@@ -32,6 +33,32 @@ import { SirenAccessory } from './accessories/siren.js';
 // timeout covers, and withTimeout does not cancel the work it bounds, so
 // firing first would only orphan a request the socket is still waiting on.
 const POLL_CYCLE_TIMEOUT_MS = 40000;
+// How long Blink must keep omitting a device, while still reporting others of
+// its kind, before the accessory is unregistered. One short or partial
+// response must not cost the user rooms, names, scenes and automations.
+const ACCESSORY_REMOVAL_GRACE_MS = 5 * 60 * 1000;
+
+type DeviceKind = 'Network' | 'Camera' | 'Doorbell' | 'Siren';
+
+const CANONICAL_ID = /^Blink:Network:(\d+)(?::(Camera|Doorbell|Siren):(\d+))?$/;
+
+/** The identity an accessory was registered under, if it is a current one. */
+function parseCanonicalID(
+  accessory: PlatformAccessory
+): { kind: DeviceKind; networkID: number; id: number } | undefined {
+  const canonicalID: unknown = accessory.context.canonicalID;
+  const match =
+    typeof canonicalID === 'string' ? CANONICAL_ID.exec(canonicalID) : null;
+  if (!match) {
+    return undefined;
+  }
+  const networkID = Number(match[1]);
+  return {
+    kind: (match[2] as DeviceKind | undefined) ?? 'Network',
+    networkID,
+    id: match[3] === undefined ? networkID : Number(match[3]),
+  };
+}
 
 export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private readonly log: Logger;
@@ -55,6 +82,11 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private readonly registeredUUIDs = new Set<string>();
   // Device set seen by the last sync, to skip needless reconciles.
   private lastDeviceFingerprint = '';
+  // When each cached accessory was first found removable, by UUID.
+  private readonly removableSince = new Map<string, number>();
+  // Accessories last reported as kept without a device, to report changes
+  // only.
+  private lastKept = '';
 
   constructor(log: Logger, config: PlatformConfig, api: API) {
     this.log = log;
@@ -283,24 +315,8 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         .catch(err => this.log.debug(`Accessory teardown failed: ${err}`));
     }
 
-    // Anything previously registered (this run or restored from cache) that
-    // no longer maps to a device is stale.
     const activeUUIDs = new Set(active.map(a => a.UUID));
-    let stale = this.cachedAccessories.filter(a => !activeUUIDs.has(a.UUID));
-
-    // Never unregister everything. An account that reports zero devices is
-    // far more likely to be a transient API or auth problem than a user
-    // deleting every camera, and unregistering takes their room assignments,
-    // names, scenes and automations with it. The device layer applies the
-    // same floor per device kind (see pruneRemovedDevices); this is the
-    // backstop for the accessory layer as a whole.
-    if (active.length === 0 && stale.length > 0) {
-      this.log.warn(
-        `Blink reported no devices; keeping ${stale.length} existing ` +
-          'accessories rather than removing them'
-      );
-      stale = [];
-    }
+    const stale = this.staleAccessories(active, activeUUIDs);
 
     if (stale.length > 0) {
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale);
@@ -309,6 +325,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
           stale.map(a => a.displayName).join(', ')
       );
       for (const accessory of stale) {
+        this.removableSince.delete(accessory.UUID);
         this.registeredUUIDs.delete(accessory.UUID);
         const index = this.cachedAccessories.indexOf(accessory);
         if (index >= 0) {
@@ -338,6 +355,110 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         `(${registrations.length} new, ${stale.length} stale removed, ` +
         `${this.cachedAccessories.length} cached)`
     );
+  }
+
+  /**
+   * Cached accessories to unregister on this pass.
+   *
+   * Unregistering takes the user's room assignments, names, scenes and
+   * automations with it and nothing restores them, so an accessory that
+   * merely has no device right now is kept. It is removed when the user
+   * hid its kind, or when Blink keeps reporting other devices of that kind
+   * without it for the whole grace period. A kind Blink reports none of is
+   * far more likely a partial response than a mass deletion, at startup as
+   * much as mid-session.
+   */
+  private staleAccessories(
+    active: PlatformAccessory[],
+    activeUUIDs: Set<string>
+  ): PlatformAccessory[] {
+    const reportedKinds = new Set(active.map(a => parseCanonicalID(a)?.kind));
+    const now = Date.now();
+    const stale: PlatformAccessory[] = [];
+    const kept: PlatformAccessory[] = [];
+
+    for (const accessory of this.cachedAccessories) {
+      if (activeUUIDs.has(accessory.UUID)) {
+        this.removableSince.delete(accessory.UUID);
+        continue;
+      }
+      const kind = parseCanonicalID(accessory)?.kind;
+      // No current identity means no device can ever claim it again.
+      if (!kind || this.isHidden(kind)) {
+        stale.push(accessory);
+        continue;
+      }
+      const removable =
+        reportedKinds.has(kind) &&
+        !this.blink?.unresolvedDevices.has(accessory.context.canonicalID);
+      if (!removable) {
+        this.removableSince.delete(accessory.UUID);
+        kept.push(accessory);
+        continue;
+      }
+      const since = this.removableSince.get(accessory.UUID) ?? now;
+      this.removableSince.set(accessory.UUID, since);
+      if (now - since >= ACCESSORY_REMOVAL_GRACE_MS) {
+        stale.push(accessory);
+      }
+    }
+
+    const keptNames = kept.map(a => a.displayName).join(', ');
+    if (keptNames !== this.lastKept) {
+      this.lastKept = keptNames;
+      if (kept.length > 0) {
+        this.log.warn(
+          `Blink did not account for ${kept.length} existing accessories; ` +
+            `keeping them rather than removing them: ${keptNames}. If these ` +
+            'devices were removed from the Blink account, remove them from ' +
+            'the Homebridge accessory cache.'
+        );
+      }
+    }
+    return stale;
+  }
+
+  /** Whether the user's config keeps this kind of device out of HomeKit. */
+  private isHidden(kind: DeviceKind): boolean {
+    switch (kind) {
+      case 'Camera':
+        return this.config.noCameras;
+      case 'Doorbell':
+        return this.config.noDoorbells;
+      case 'Network':
+        return this.config.noAlarm && this.config.noManualArmSwitch;
+      case 'Siren':
+        return false;
+    }
+  }
+
+  /** Whether an accessory has now been removable for the grace period. */
+  private removalDue(): boolean {
+    const now = Date.now();
+    return [...this.removableSince.values()].some(
+      since => now - since >= ACCESSORY_REMOVAL_GRACE_MS
+    );
+  }
+
+  /**
+   * Doorbells already in the accessory cache. The device layer asks Blink
+   * about these by ID, so keeping one never depends on it having a recent
+   * clip when Homebridge starts.
+   */
+  private cachedDoorbells(): CachedDoorbell[] {
+    const doorbells: CachedDoorbell[] = [];
+    for (const accessory of this.cachedAccessories) {
+      const identity = parseCanonicalID(accessory);
+      if (identity?.kind === 'Doorbell') {
+        doorbells.push({
+          id: identity.id,
+          networkID: identity.networkID,
+          canonicalID: accessory.context.canonicalID,
+          displayName: accessory.displayName,
+        });
+      }
+    }
+    return doorbells;
   }
 
   /* Accessory construction is isolated behind these hooks so the reconcile
@@ -394,6 +515,9 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       ...[...this.blink.cameras.values()].map(c => c.canonicalID),
       ...[...this.blink.doorbells.values()].map(d => d.canonicalID),
       ...[...this.blink.sirens.values()].map(s => s.canonicalID),
+      // A cached device gaining or losing its verdict changes what may be
+      // unregistered, without changing the device set.
+      ...[...this.blink.unresolvedDevices].map(id => `unresolved:${id}`),
     ]
       .sort()
       .join('|');
@@ -421,7 +545,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       // Devices added or removed in the Blink app reach HomeKit here; the
       // fingerprint keeps the common no-change case free.
       const fingerprint = this.deviceFingerprint();
-      if (fingerprint !== this.lastDeviceFingerprint) {
+      if (fingerprint !== this.lastDeviceFingerprint || this.removalDue()) {
         this.lastDeviceFingerprint = fingerprint;
         this.syncAccessories();
       }
@@ -520,6 +644,9 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       this.config
     );
 
+    if (!this.config.noDoorbells) {
+      blink.seedCachedDoorbells(this.cachedDoorbells());
+    }
     await blink.refreshData();
     return blink;
   }
