@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.0...v2.0.1) (2026-10-04)
+
+### Bug Fixes
+
+* **platform:** keep accessories until Blink confirms their device is gone ([4550c85](https://github.com/BitWise-0x/homebridge-blink-security/commit/4550c85574b4bfcd33e472d83ad88fb4a2d150c9)), closes [#76](https://github.com/BitWise-0x/homebridge-blink-security/issues/76)
+
 ## [2.0.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v1.13.0...v2.0.0) (2026-09-29)
 
 ### ⚠ BREAKING CHANGES
