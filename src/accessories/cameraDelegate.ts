@@ -399,12 +399,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       // IMMI protocol — MPEG-TS input from local tunnel
       ffmpegArgs.push(
         '-hide_banner',
-        // info (not warning): the 0-channel audio recovery below matches the
-        // stream-discovery line "Audio: ... 0 channels", which ffmpeg prints
-        // at info. warning hides it, so a camera with Audio Streaming off
-        // stalls the whole pipeline and HomeKit times out with no picture.
         '-loglevel',
-        'info',
+        'warning',
         '-analyzeduration',
         '2000000',
         '-probesize',
@@ -643,18 +639,14 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     ffmpegVideo.stderr?.on('data', (data: Buffer) => {
       const msg = String(data).trim();
       this.log.debug(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
-      if (ffmpegLineForInfoLog(msg)) {
-        this.log.info(
-          `${this.blinkCamera.name} - ffmpeg: ${msg.replace(/\s+/g, ' ').slice(0, 300)}`
-        );
-      }
       if (msg.includes('bind failed') || msg.includes('Error opening output')) {
         this.outputErrorSessions.add(sessionID);
       }
       if (
         !zeroChannelAudioHandled &&
         hasAudio &&
-        audioMetadataIsUnusable(msg)
+        msg.includes('Audio:') &&
+        msg.includes('0 channels')
       ) {
         zeroChannelAudioHandled = true;
         this.log.warn(
@@ -1005,26 +997,4 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     await proxyServer.start();
     return proxyServer;
   }
-}
-
-/** Stream-discovery and failure lines. Skips SRTP key material. */
-function ffmpegLineForInfoLog(msg: string): boolean {
-  if (/srtp|key|salt/i.test(msg)) {
-    return false;
-  }
-  return /error|invalid|0 channels|Audio:|Video:|bind failed|Output #/i.test(
-    msg
-  );
-}
-
-/**
- * True when ffmpeg has reported audio that cannot be encoded for HomeKit.
- * "0 channels" is the Blink privacy-mode case. libfdk_aac then either stalls
- * the pipeline or exits, and video never reaches HomeKit.
- */
-function audioMetadataIsUnusable(msg: string): boolean {
-  if (msg.includes('Audio:') && msg.includes('0 channels')) {
-    return true;
-  }
-  return /libfdk_aac/i.test(msg) && /invalid|error|failed/i.test(msg);
 }
