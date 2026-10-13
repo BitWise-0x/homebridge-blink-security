@@ -147,6 +147,12 @@
         "description": "Optional ffmpeg audio filtergraph applied to Live View audio, passed verbatim to -af. Leave blank for unprocessed audio. Example: volume=2.0,alimiter=limit=0.95 to double the volume without clipping. Requires Enable Audio. An invalid filtergraph will cause the stream to fail.",
         "placeholder": "volume=2.0,alimiter=limit=0.95"
       },
+      "stream-address": {
+        "title": "Live View Source Address (advanced)",
+        "type": "string",
+        "description": "IPv4 address on this host that HomeKit can reach, used as the camera address and as the source of live-view RTP. Leave blank to pick the interface on the same subnet as the Home controller. Set it when the host has several networks (a VM NAT address plus a bridged LAN address) and live view never starts.",
+        "placeholder": "192.168.10.20"
+      },
       "local-storage-motion": {
         "title": "Local Storage Motion Detection",
         "type": "string",
@@ -202,6 +208,7 @@
         "camera-motion-polling-seconds",
         "local-storage-motion",
         "audio-filter",
+        "stream-address",
         "logging",
         "enable-startup-diagnostic"
       ]

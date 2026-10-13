@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { writeFile, unlink } from 'fs/promises';
-import { tmpdir } from 'os';
+import { networkInterfaces, tmpdir } from 'os';
 import { join } from 'path';
 import {
   type CameraController,
@@ -27,10 +27,13 @@ const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
 import { ImmiTunnel, RtspToH264Proxy } from '../lib/proxy.js';
+import { rtpOutputUrl, selectStreamAddress } from '../lib/streamAddress.js';
 import { sleep } from '../lib/utils.js';
 
 interface SessionInfo {
   address: string;
+  /** Local address ffmpeg sends from, and the address told to HomeKit. */
+  sourceAddress?: string;
   videoPort: number;
   videoCryptoSuite: number;
   videoSRTP: Buffer;
@@ -68,6 +71,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly liveViewEnabled: boolean;
   private readonly audioEnabled: boolean;
   private readonly audioFilter: string;
+  private readonly streamAddress: string;
   private readonly hideRoutineLogs: boolean;
   controller?: CameraController;
   private pendingSessions = new Map<string, SessionInfo>();
@@ -96,7 +100,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     liveViewEnabled = true,
     audioEnabled = false,
     hideRoutineLogs = false,
-    audioFilter = ''
+    audioFilter = '',
+    streamAddress = ''
   ) {
     this.blinkCamera = blinkCamera;
     this.log = log;
@@ -105,6 +110,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     this.audioEnabled = audioEnabled;
     this.hideRoutineLogs = hideRoutineLogs;
     this.audioFilter = audioFilter;
+    this.streamAddress = streamAddress;
   }
 
   async handleSnapshotRequest(
@@ -157,8 +163,31 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     const videoSSRC = this.hap.CameraController.generateSynchronisationSource();
     const audioSSRC = this.hap.CameraController.generateSynchronisationSource();
+    const preferIpv6 = request.addressVersion === 'ipv6';
+    const fallbackAddress = await getDefaultIpAddress(preferIpv6);
+    const selected = selectStreamAddress(
+      request.targetAddress,
+      networkInterfaces(),
+      this.streamAddress,
+      fallbackAddress
+    );
+    const sourceAddress = selected?.address ?? fallbackAddress;
+    if (
+      selected &&
+      selected.reason !== 'default' &&
+      sourceAddress !== fallbackAddress
+    ) {
+      this.log.info(
+        `${this.blinkCamera.name} - LiveView source ${sourceAddress} (${selected.reason}); default route is ${fallbackAddress}`
+      );
+    } else if (this.streamAddress && selected?.reason !== 'configured') {
+      this.log.warn(
+        `${this.blinkCamera.name} - stream-address ${this.streamAddress} is not on this host; using ${sourceAddress}`
+      );
+    }
     const sessionInfo: SessionInfo = {
       address: request.targetAddress,
+      sourceAddress,
       videoPort: request.video.port,
       videoCryptoSuite: request.video.srtpCryptoSuite,
       videoSRTP: Buffer.concat([
@@ -185,9 +214,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       : undefined;
 
     const response: PrepareStreamResponse = {
-      addressOverride: await getDefaultIpAddress(
-        request.addressVersion === 'ipv6'
-      ),
+      addressOverride: sourceAddress,
       video: {
         port: request.video.port,
         ssrc: videoSSRC,
@@ -347,9 +374,11 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const phase = this.audioDisabledSessions.has(sessionID)
       ? 'RESTART (video-only)'
       : 'START';
+    const sourceAddress = sessionInfo.sourceAddress;
     if (!this.hideRoutineLogs) {
+      const srcNote = sourceAddress ? `, src ${sourceAddress}` : '';
       this.log.info(
-        `${this.blinkCamera.name} - LiveView ${phase} (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps)`
+        `${this.blinkCamera.name} - LiveView ${phase} (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps${srcNote})`
       );
     }
 
@@ -370,8 +399,12 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       // IMMI protocol — MPEG-TS input from local tunnel
       ffmpegArgs.push(
         '-hide_banner',
+        // info (not warning): the 0-channel audio recovery below matches the
+        // stream-discovery line "Audio: ... 0 channels", which ffmpeg prints
+        // at info. warning hides it, so a camera with Audio Streaming off
+        // stalls the whole pipeline and HomeKit times out with no picture.
         '-loglevel',
-        'warning',
+        'info',
         '-analyzeduration',
         '2000000',
         '-probesize',
@@ -495,7 +528,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     }
 
     ffmpegArgs.push(
-      `${targetProtocol}://${address}:${videoPort}?rtcpport=${videoPort}&pkt_size=${video.mtu}`
+      rtpOutputUrl(
+        targetProtocol,
+        address,
+        videoPort,
+        video.mtu,
+        sessionInfo.sourceAddress
+      )
     );
 
     // Audio output — transcode AAC from camera to OPUS for HomeKit
@@ -547,7 +586,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       }
 
       ffmpegArgs.push(
-        `${audioProtocol}://${address}:${audioPort}?rtcpport=${audioPort}&pkt_size=188`
+        rtpOutputUrl(
+          audioProtocol,
+          address,
+          audioPort,
+          188,
+          sessionInfo.sourceAddress
+        )
       );
     }
 
@@ -598,14 +643,18 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     ffmpegVideo.stderr?.on('data', (data: Buffer) => {
       const msg = String(data).trim();
       this.log.debug(`${this.blinkCamera.name} - ffmpeg: ${msg}`);
+      if (ffmpegLineForInfoLog(msg)) {
+        this.log.info(
+          `${this.blinkCamera.name} - ffmpeg: ${msg.replace(/\s+/g, ' ').slice(0, 300)}`
+        );
+      }
       if (msg.includes('bind failed') || msg.includes('Error opening output')) {
         this.outputErrorSessions.add(sessionID);
       }
       if (
         !zeroChannelAudioHandled &&
         hasAudio &&
-        msg.includes('Audio:') &&
-        msg.includes('0 channels')
+        audioMetadataIsUnusable(msg)
       ) {
         zeroChannelAudioHandled = true;
         this.log.warn(
@@ -956,4 +1005,26 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     await proxyServer.start();
     return proxyServer;
   }
+}
+
+/** Stream-discovery and failure lines. Skips SRTP key material. */
+function ffmpegLineForInfoLog(msg: string): boolean {
+  if (/srtp|key|salt/i.test(msg)) {
+    return false;
+  }
+  return /error|invalid|0 channels|Audio:|Video:|bind failed|Output #/i.test(
+    msg
+  );
+}
+
+/**
+ * True when ffmpeg has reported audio that cannot be encoded for HomeKit.
+ * "0 channels" is the Blink privacy-mode case. libfdk_aac then either stalls
+ * the pipeline or exits, and video never reaches HomeKit.
+ */
+function audioMetadataIsUnusable(msg: string): boolean {
+  if (msg.includes('Audio:') && msg.includes('0 channels')) {
+    return true;
+  }
+  return /libfdk_aac/i.test(msg) && /invalid|error|failed/i.test(msg);
 }

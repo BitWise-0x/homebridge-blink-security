@@ -204,6 +204,14 @@ describe('normalizeConfig', () => {
       expect(opts.debug).toBe(false);
     });
 
+    it('maps stream-address and ignores blank', () => {
+      expect(normalizeConfig(makeConfig()).streamAddress).toBe('');
+      expect(
+        normalizeConfig(makeConfig({ 'stream-address': ' 192.168.10.20 ' }))
+          .streamAddress
+      ).toBe('192.168.10.20');
+    });
+
     it('sets all false for unknown logging value', () => {
       const opts = normalizeConfig(
         makeConfig({ logging: 'info' as 'verbose' })

@@ -23,6 +23,11 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'enable-startup-diagnostic'?: boolean;
   'enable-audio'?: boolean;
   'audio-filter'?: string;
+  /**
+   * Local IPv4 HomeKit should use as the camera address. Blank picks the
+   * interface on the same subnet as the Home controller.
+   */
+  'stream-address'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
 }
 
@@ -53,6 +58,7 @@ export interface BlinkOptions {
   startupDiagnostic: boolean;
   enableAudio: boolean;
   audioFilter: string;
+  streamAddress: string;
   hideRoutineLogs: boolean;
   localStorageMotion: LocalStorageMotionMode;
 }
@@ -83,6 +89,7 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   startupDiagnostic: false,
   enableAudio: false,
   audioFilter: '',
+  streamAddress: '',
   hideRoutineLogs: false,
   localStorageMotion: 'auto',
 };
@@ -144,6 +151,14 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
       : '';
   if (audioFilter) {
     opts.audioFilter = audioFilter;
+  }
+
+  const streamAddress =
+    typeof config['stream-address'] === 'string'
+      ? config['stream-address'].trim()
+      : '';
+  if (streamAddress) {
+    opts.streamAddress = streamAddress;
   }
 
   if (opts.snapshotSeconds <= 0 || opts.noThumbnailRefresh) {
