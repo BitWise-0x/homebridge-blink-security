@@ -205,11 +205,42 @@ describe('normalizeConfig', () => {
     });
 
     it('maps stream-address and ignores blank', () => {
-      expect(normalizeConfig(makeConfig()).streamAddress).toBe('');
+      const ifaces = {
+        en0: [
+          {
+            address: '192.168.10.20',
+            netmask: '255.255.255.0',
+            family: 'IPv4' as const,
+            mac: '00:00:00:00:00:00',
+            internal: false,
+            cidr: '192.168.10.20/24',
+          },
+        ],
+      };
+      const warn = vi.fn();
+      expect(normalizeConfig(makeConfig(), warn, ifaces).streamAddress).toBe(
+        ''
+      );
       expect(
-        normalizeConfig(makeConfig({ 'stream-address': ' 192.168.10.20 ' }))
-          .streamAddress
+        normalizeConfig(
+          makeConfig({ 'stream-address': ' 192.168.10.20 ' }),
+          warn,
+          ifaces
+        ).streamAddress
       ).toBe('192.168.10.20');
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('warns once and ignores a stream-address not on this host', () => {
+      const warn = vi.fn();
+      const opts = normalizeConfig(
+        makeConfig({ 'stream-address': '10.9.9.9' }),
+        warn,
+        {}
+      );
+      expect(opts.streamAddress).toBe('');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('10.9.9.9');
     });
 
     it('sets all false for unknown logging value', () => {

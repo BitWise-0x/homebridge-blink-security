@@ -91,7 +91,9 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   constructor(log: Logger, config: PlatformConfig, api: API) {
     this.log = log;
     this.rawConfig = config as BlinkSecurityConfig;
-    this.config = normalizeConfig(this.rawConfig);
+    this.config = normalizeConfig(this.rawConfig, message =>
+      this.log.warn(message)
+    );
     this.config.storagePath = api.user.storagePath();
     this.api = api;
 

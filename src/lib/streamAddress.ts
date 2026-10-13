@@ -1,4 +1,7 @@
+import { BlockList, isIPv4 } from 'net';
 import type { NetworkInterfaceInfo } from 'os';
+
+type Interfaces = NodeJS.Dict<NetworkInterfaceInfo[] | undefined>;
 
 /**
  * Which local address HomeKit should treat as the camera, and which address
@@ -16,38 +19,42 @@ export interface StreamAddressSelection {
   reason: 'configured' | 'subnet' | 'default';
 }
 
+const LINK_LOCAL = new BlockList();
+LINK_LOCAL.addSubnet('169.254.0.0', 16, 'ipv4');
+
 export function selectStreamAddress(
   targetAddress: string,
-  interfaces: NodeJS.Dict<NetworkInterfaceInfo[] | undefined>,
+  interfaces: Interfaces,
   configured?: string,
-  fallback?: string
+  defaultAddress?: string
 ): StreamAddressSelection | undefined {
   const pinned = configured?.trim();
   if (pinned && addressIsLocal(pinned, interfaces)) {
     return { address: pinned, reason: 'configured' };
   }
 
-  const subnet = addressOnTargetSubnet(targetAddress, interfaces);
+  const subnet = addressOnTargetSubnet(
+    targetAddress,
+    interfaces,
+    defaultAddress
+  );
   if (subnet) {
     return { address: subnet, reason: 'subnet' };
   }
 
-  if (fallback) {
-    return { address: fallback, reason: 'default' };
+  if (defaultAddress) {
+    return { address: defaultAddress, reason: 'default' };
   }
   return undefined;
 }
 
 export function addressIsLocal(
   address: string,
-  interfaces: NodeJS.Dict<NetworkInterfaceInfo[] | undefined>
+  interfaces: Interfaces
 ): boolean {
   for (const infos of Object.values(interfaces)) {
     for (const info of infos ?? []) {
-      if (info.internal) {
-        continue;
-      }
-      if (info.address === address) {
+      if (!info.internal && info.address === address) {
         return true;
       }
     }
@@ -56,39 +63,66 @@ export function addressIsLocal(
 }
 
 /**
- * Local address on the same subnet as `targetAddress`, longest prefix wins.
- * Skips loopback. Returns undefined when nothing contains the target.
+ * Local IPv4 address on the same subnet as `targetAddress`. When several
+ * interfaces match, `defaultAddress` wins if it is one of them; otherwise the
+ * longest prefix wins. Skips loopback and link-local. Returns undefined when
+ * nothing contains the target.
  */
 export function addressOnTargetSubnet(
   targetAddress: string,
-  interfaces: NodeJS.Dict<NetworkInterfaceInfo[] | undefined>
+  interfaces: Interfaces,
+  defaultAddress?: string
 ): string | undefined {
-  const target = ipv4ToInt(targetAddress);
-  if (target === undefined) {
+  if (!isRoutableIPv4(targetAddress)) {
     return undefined;
   }
 
-  let best: { address: string; prefix: number } | undefined;
+  const matches: { address: string; prefix: number }[] = [];
   for (const infos of Object.values(interfaces)) {
     for (const info of infos ?? []) {
-      if (info.internal || info.family !== 'IPv4') {
+      if (
+        info.internal ||
+        info.family !== 'IPv4' ||
+        !isRoutableIPv4(info.address)
+      ) {
         continue;
       }
-      const ip = ipv4ToInt(info.address);
-      const mask = ipv4ToInt(info.netmask);
-      if (ip === undefined || mask === undefined || mask === 0) {
+      const prefix = prefixFromCidr(info.cidr);
+      if (prefix === undefined || prefix === 0) {
         continue;
       }
-      if ((ip & mask) !== (target & mask)) {
-        continue;
-      }
-      const prefix = prefixLength(mask);
-      if (!best || prefix > best.prefix) {
-        best = { address: info.address, prefix };
+      const subnet = new BlockList();
+      subnet.addSubnet(info.address, prefix, 'ipv4');
+      if (subnet.check(targetAddress, 'ipv4')) {
+        matches.push({ address: info.address, prefix });
       }
     }
   }
-  return best?.address;
+
+  if (defaultAddress && matches.some(m => m.address === defaultAddress)) {
+    return defaultAddress;
+  }
+  matches.sort((a, b) => b.prefix - a.prefix);
+  return matches[0]?.address;
+}
+
+/**
+ * Local address ffmpeg should bind its RTP output to, or undefined to let the
+ * OS choose. Only set when the picked IPv4 differs from the default route, so
+ * single-NIC hosts and IPv6 sessions behave exactly as before.
+ */
+export function rtpLocalAddress(
+  sourceAddress: string | undefined,
+  defaultAddress: string | undefined
+): string | undefined {
+  if (
+    !sourceAddress ||
+    sourceAddress === defaultAddress ||
+    !isRoutableIPv4(sourceAddress)
+  ) {
+    return undefined;
+  }
+  return sourceAddress;
 }
 
 /** ffmpeg RTP/SRTP output URL, sourced from `localAddress` when set. */
@@ -110,31 +144,13 @@ export function rtpOutputUrl(
   return `${protocol}://${host}:${port}?${query.join('&')}`;
 }
 
-function ipv4ToInt(ip: string): number | undefined {
-  const parts = ip.split('.');
-  if (parts.length !== 4) {
-    return undefined;
-  }
-  let value = 0;
-  for (const part of parts) {
-    if (!/^\d{1,3}$/.test(part)) {
-      return undefined;
-    }
-    const octet = Number(part);
-    if (octet > 255) {
-      return undefined;
-    }
-    value = ((value << 8) | octet) >>> 0;
-  }
-  return value;
+function isRoutableIPv4(address: string): boolean {
+  return isIPv4(address) && !LINK_LOCAL.check(address, 'ipv4');
 }
 
-function prefixLength(mask: number): number {
-  let bits = 0;
-  let m = mask;
-  while (m) {
-    bits += m & 1;
-    m >>>= 1;
-  }
-  return bits;
+function prefixFromCidr(cidr: string | null): number | undefined {
+  const prefix = Number(cidr?.split('/')[1]);
+  return Number.isInteger(prefix) && prefix >= 0 && prefix <= 32
+    ? prefix
+    : undefined;
 }

@@ -27,13 +27,19 @@ const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
 import { ImmiTunnel, RtspToH264Proxy } from '../lib/proxy.js';
-import { rtpOutputUrl, selectStreamAddress } from '../lib/streamAddress.js';
+import {
+  rtpLocalAddress,
+  rtpOutputUrl,
+  selectStreamAddress,
+} from '../lib/streamAddress.js';
 import { sleep } from '../lib/utils.js';
 
 interface SessionInfo {
   address: string;
-  /** Local address ffmpeg sends from, and the address told to HomeKit. */
+  /** Address told to HomeKit as the camera address. */
   sourceAddress?: string;
+  /** Set only when ffmpeg must bind RTP to a non-default-route address. */
+  localAddress?: string;
   videoPort: number;
   videoCryptoSuite: number;
   videoSRTP: Buffer;
@@ -163,31 +169,29 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     const videoSSRC = this.hap.CameraController.generateSynchronisationSource();
     const audioSSRC = this.hap.CameraController.generateSynchronisationSource();
-    const preferIpv6 = request.addressVersion === 'ipv6';
-    const fallbackAddress = await getDefaultIpAddress(preferIpv6);
-    const selected = selectStreamAddress(
-      request.targetAddress,
-      networkInterfaces(),
-      this.streamAddress,
-      fallbackAddress
-    );
-    const sourceAddress = selected?.address ?? fallbackAddress;
-    if (
-      selected &&
-      selected.reason !== 'default' &&
-      sourceAddress !== fallbackAddress
-    ) {
+    const ipv6 = request.addressVersion === 'ipv6';
+    const defaultAddress = await getDefaultIpAddress(ipv6);
+    const selected = ipv6
+      ? undefined
+      : selectStreamAddress(
+          request.targetAddress,
+          networkInterfaces(),
+          this.streamAddress,
+          defaultAddress
+        );
+    const sourceAddress = selected?.address ?? defaultAddress;
+    const localAddress = ipv6
+      ? undefined
+      : rtpLocalAddress(sourceAddress, defaultAddress);
+    if (localAddress && !this.hideRoutineLogs) {
       this.log.info(
-        `${this.blinkCamera.name} - LiveView source ${sourceAddress} (${selected.reason}); default route is ${fallbackAddress}`
-      );
-    } else if (this.streamAddress && selected?.reason !== 'configured') {
-      this.log.warn(
-        `${this.blinkCamera.name} - stream-address ${this.streamAddress} is not on this host; using ${sourceAddress}`
+        `${this.blinkCamera.name} - LiveView source ${localAddress} (${selected?.reason}); default route is ${defaultAddress}`
       );
     }
     const sessionInfo: SessionInfo = {
       address: request.targetAddress,
       sourceAddress,
+      localAddress,
       videoPort: request.video.port,
       videoCryptoSuite: request.video.srtpCryptoSuite,
       videoSRTP: Buffer.concat([
@@ -529,7 +533,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         address,
         videoPort,
         video.mtu,
-        sessionInfo.sourceAddress
+        sessionInfo.localAddress
       )
     );
 
@@ -587,7 +591,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
           address,
           audioPort,
           188,
-          sessionInfo.sourceAddress
+          sessionInfo.localAddress
         )
       );
     }

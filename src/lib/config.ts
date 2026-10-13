@@ -1,4 +1,7 @@
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os';
 import { PlatformConfig } from 'homebridge';
+
+import { addressIsLocal } from './streamAddress.js';
 
 export interface BlinkSecurityConfig extends PlatformConfig {
   username: string;
@@ -94,7 +97,13 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   localStorageMotion: 'auto',
 };
 
-export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
+export function normalizeConfig(
+  config: BlinkSecurityConfig,
+  warn?: (message: string) => void,
+  interfaces: NodeJS.Dict<
+    NetworkInterfaceInfo[] | undefined
+  > = networkInterfaces()
+): BlinkOptions {
   const opts: BlinkOptions = { ...DEFAULT_OPTIONS };
 
   opts.username = config.username ?? '';
@@ -158,7 +167,13 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
       ? config['stream-address'].trim()
       : '';
   if (streamAddress) {
-    opts.streamAddress = streamAddress;
+    if (addressIsLocal(streamAddress, interfaces)) {
+      opts.streamAddress = streamAddress;
+    } else {
+      warn?.(
+        `stream-address ${streamAddress} is not an address on this host; ignoring it and picking the Live View address automatically.`
+      );
+    }
   }
 
   if (opts.snapshotSeconds <= 0 || opts.noThumbnailRefresh) {

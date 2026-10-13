@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { NetworkInterfaceInfo } from 'os';
 import {
   addressOnTargetSubnet,
+  rtpLocalAddress,
   rtpOutputUrl,
   selectStreamAddress,
 } from '../streamAddress.js';
@@ -17,9 +18,18 @@ function iface(
     family: 'IPv4',
     mac: '00:00:00:00:00:00',
     internal: false,
-    cidr: null,
+    cidr: `${address}/${maskBits(netmask)}`,
     ...extra,
   };
+}
+
+function maskBits(netmask: string): number {
+  return netmask
+    .split('.')
+    .reduce(
+      (n, octet) => n + Number(octet).toString(2).split('1').length - 1,
+      0
+    );
 }
 
 /** Colima-style host: NAT default NIC plus a bridged LAN NIC and docker bridges. */
@@ -55,6 +65,27 @@ describe('addressOnTargetSubnet', () => {
   it('ignores loopback and a /32 that does not contain the target', () => {
     expect(addressOnTargetSubnet('100.92.1.4', MULTIHOME)).toBeUndefined();
     expect(addressOnTargetSubnet('127.0.0.2', MULTIHOME)).toBeUndefined();
+  });
+
+  it('prefers the default-route address when several NICs match', () => {
+    const ifaces = {
+      wlan0: [iface('10.0.1.30', '255.255.255.0')],
+      eth0: [iface('10.0.1.15', '255.255.255.0')],
+    };
+    expect(addressOnTargetSubnet('10.0.1.50', ifaces, '10.0.1.15')).toBe(
+      '10.0.1.15'
+    );
+    expect(
+      selectStreamAddress('10.0.1.50', ifaces, undefined, '10.0.1.15')
+    ).toEqual({ address: '10.0.1.15', reason: 'subnet' });
+  });
+
+  it('skips link-local interfaces and targets', () => {
+    const ifaces = {
+      en5: [iface('169.254.10.2', '255.255.0.0')],
+      en0: [iface('192.168.10.5', '255.255.255.0')],
+    };
+    expect(addressOnTargetSubnet('169.254.10.9', ifaces)).toBeUndefined();
   });
 
   it('returns undefined for a non-IPv4 target', () => {
@@ -97,6 +128,21 @@ describe('selectStreamAddress', () => {
 
   it('returns undefined when nothing matches and no fallback is given', () => {
     expect(selectStreamAddress('10.9.9.9', MULTIHOME)).toBeUndefined();
+  });
+});
+
+describe('rtpLocalAddress', () => {
+  it('binds only when the picked address differs from the default route', () => {
+    expect(rtpLocalAddress('192.168.10.20', '192.168.5.1')).toBe(
+      '192.168.10.20'
+    );
+    expect(rtpLocalAddress('192.168.5.1', '192.168.5.1')).toBeUndefined();
+    expect(rtpLocalAddress(undefined, '192.168.5.1')).toBeUndefined();
+  });
+
+  it('never binds IPv6 or link-local addresses', () => {
+    expect(rtpLocalAddress('fe80::2', 'fe80::1')).toBeUndefined();
+    expect(rtpLocalAddress('169.254.3.4', '192.168.5.1')).toBeUndefined();
   });
 });
 
