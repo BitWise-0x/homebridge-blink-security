@@ -1,3 +1,4 @@
+import { isIPv4 } from 'net';
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os';
 import { PlatformConfig } from 'homebridge';
 
@@ -26,10 +27,6 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'enable-startup-diagnostic'?: boolean;
   'enable-audio'?: boolean;
   'audio-filter'?: string;
-  /**
-   * Local IPv4 HomeKit should use as the camera address. Blank picks the
-   * interface on the same subnet as the Home controller.
-   */
   'stream-address'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
 }
@@ -167,11 +164,11 @@ export function normalizeConfig(
       ? config['stream-address'].trim()
       : '';
   if (streamAddress) {
-    if (addressIsLocal(streamAddress, interfaces)) {
+    if (isIPv4(streamAddress) && addressIsLocal(streamAddress, interfaces)) {
       opts.streamAddress = streamAddress;
     } else {
       warn?.(
-        `stream-address ${streamAddress} is not an address on this host; ignoring it and picking the Live View address automatically.`
+        `stream-address ${streamAddress} is not an IPv4 address on this host; ignoring it and picking the Live View address automatically.`
       );
     }
   }

@@ -291,6 +291,8 @@ If Audio Streaming is disabled in the Blink app, the camera sends malformed audi
 
 If Live View spins and eventually shows "Not responding" in the Home app, the most common cause is audio being enabled in plugin config while Audio Streaming is disabled in the Blink app for that camera. Either enable Audio Streaming in the Blink app, or set `enable-audio: false` in plugin config.
 
+On a host with more than one network (Docker under a VM, a NAT address plus a bridged LAN address), Live View can also fail because HomeKit is given an address it cannot reach. The plugin picks the interface on the Home controller's subnet automatically. If that still picks the wrong one, set `stream-address` to the host's LAN IPv4 address.
+
 ### No HomeKit notifications at all
 
 Notification preferences live in iOS, not in the plugin, and they are per accessory and default to off for new accessories. To enable them for each camera:

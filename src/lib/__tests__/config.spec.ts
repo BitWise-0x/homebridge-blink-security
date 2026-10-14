@@ -243,6 +243,29 @@ describe('normalizeConfig', () => {
       expect(warn.mock.calls[0][0]).toContain('10.9.9.9');
     });
 
+    it('ignores an IPv6 stream-address even when it is on this host', () => {
+      const warn = vi.fn();
+      const opts = normalizeConfig(
+        makeConfig({ 'stream-address': 'fd00::20' }),
+        warn,
+        {
+          en0: [
+            {
+              address: 'fd00::20',
+              netmask: 'ffff:ffff:ffff:ffff::',
+              family: 'IPv6' as const,
+              mac: '00:00:00:00:00:00',
+              internal: false,
+              cidr: 'fd00::20/64',
+              scopeid: 0,
+            },
+          ],
+        }
+      );
+      expect(opts.streamAddress).toBe('');
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
     it('sets all false for unknown logging value', () => {
       const opts = normalizeConfig(
         makeConfig({ logging: 'info' as 'verbose' })

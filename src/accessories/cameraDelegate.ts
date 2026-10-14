@@ -36,8 +36,6 @@ import { sleep } from '../lib/utils.js';
 
 interface SessionInfo {
   address: string;
-  /** Address told to HomeKit as the camera address. */
-  sourceAddress?: string;
   /** Set only when ffmpeg must bind RTP to a non-default-route address. */
   localAddress?: string;
   videoPort: number;
@@ -190,7 +188,6 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     }
     const sessionInfo: SessionInfo = {
       address: request.targetAddress,
-      sourceAddress,
       localAddress,
       videoPort: request.video.port,
       videoCryptoSuite: request.video.srtpCryptoSuite,
@@ -378,11 +375,9 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     const phase = this.audioDisabledSessions.has(sessionID)
       ? 'RESTART (video-only)'
       : 'START';
-    const sourceAddress = sessionInfo.sourceAddress;
     if (!this.hideRoutineLogs) {
-      const srcNote = sourceAddress ? `, src ${sourceAddress}` : '';
       this.log.info(
-        `${this.blinkCamera.name} - LiveView ${phase} (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps${srcNote})`
+        `${this.blinkCamera.name} - LiveView ${phase} (${video.width}x${video.height}, ${video.fps} fps, ${maxBitrate} kbps)`
       );
     }
 
