@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.2...v2.0.3) (2026-10-14)
+
+### Bug Fixes
+
+* **streaming:** advertise a reachable Live View stream address ([#80](https://github.com/BitWise-0x/homebridge-blink-security/issues/80)) ([1e04321](https://github.com/BitWise-0x/homebridge-blink-security/commit/1e043212c79aa2266246ee28978e4bb4ba9a2fef))
+
 ## [2.0.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.1...v2.0.2) (2026-10-04)
 
 ### Bug Fixes
