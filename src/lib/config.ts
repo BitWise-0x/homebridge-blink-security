@@ -1,4 +1,8 @@
+import { isIPv4 } from 'net';
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os';
 import { PlatformConfig } from 'homebridge';
+
+import { addressIsLocal } from './streamAddress.js';
 
 export interface BlinkSecurityConfig extends PlatformConfig {
   username: string;
@@ -23,6 +27,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'enable-startup-diagnostic'?: boolean;
   'enable-audio'?: boolean;
   'audio-filter'?: string;
+  'stream-address'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
 }
 
@@ -53,6 +58,7 @@ export interface BlinkOptions {
   startupDiagnostic: boolean;
   enableAudio: boolean;
   audioFilter: string;
+  streamAddress: string;
   hideRoutineLogs: boolean;
   localStorageMotion: LocalStorageMotionMode;
 }
@@ -83,11 +89,18 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   startupDiagnostic: false,
   enableAudio: false,
   audioFilter: '',
+  streamAddress: '',
   hideRoutineLogs: false,
   localStorageMotion: 'auto',
 };
 
-export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
+export function normalizeConfig(
+  config: BlinkSecurityConfig,
+  warn?: (message: string) => void,
+  interfaces: NodeJS.Dict<
+    NetworkInterfaceInfo[] | undefined
+  > = networkInterfaces()
+): BlinkOptions {
   const opts: BlinkOptions = { ...DEFAULT_OPTIONS };
 
   opts.username = config.username ?? '';
@@ -144,6 +157,20 @@ export function normalizeConfig(config: BlinkSecurityConfig): BlinkOptions {
       : '';
   if (audioFilter) {
     opts.audioFilter = audioFilter;
+  }
+
+  const streamAddress =
+    typeof config['stream-address'] === 'string'
+      ? config['stream-address'].trim()
+      : '';
+  if (streamAddress) {
+    if (isIPv4(streamAddress) && addressIsLocal(streamAddress, interfaces)) {
+      opts.streamAddress = streamAddress;
+    } else {
+      warn?.(
+        `stream-address ${streamAddress} is not an IPv4 address on this host; ignoring it and picking the Live View address automatically.`
+      );
+    }
   }
 
   if (opts.snapshotSeconds <= 0 || opts.noThumbnailRefresh) {

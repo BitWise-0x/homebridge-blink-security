@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { writeFile, unlink } from 'fs/promises';
-import { tmpdir } from 'os';
+import { networkInterfaces, tmpdir } from 'os';
 import { join } from 'path';
 import {
   type CameraController,
@@ -27,10 +27,17 @@ const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
 import type { BlinkCamera } from '../devices/camera.js';
 import { ImmiTunnel, RtspToH264Proxy } from '../lib/proxy.js';
+import {
+  rtpLocalAddress,
+  rtpOutputUrl,
+  selectStreamAddress,
+} from '../lib/streamAddress.js';
 import { sleep } from '../lib/utils.js';
 
 interface SessionInfo {
   address: string;
+  /** Set only when ffmpeg must bind RTP to a non-default-route address. */
+  localAddress?: string;
   videoPort: number;
   videoCryptoSuite: number;
   videoSRTP: Buffer;
@@ -68,6 +75,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly liveViewEnabled: boolean;
   private readonly audioEnabled: boolean;
   private readonly audioFilter: string;
+  private readonly streamAddress: string;
   private readonly hideRoutineLogs: boolean;
   controller?: CameraController;
   private pendingSessions = new Map<string, SessionInfo>();
@@ -96,7 +104,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     liveViewEnabled = true,
     audioEnabled = false,
     hideRoutineLogs = false,
-    audioFilter = ''
+    audioFilter = '',
+    streamAddress = ''
   ) {
     this.blinkCamera = blinkCamera;
     this.log = log;
@@ -105,6 +114,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     this.audioEnabled = audioEnabled;
     this.hideRoutineLogs = hideRoutineLogs;
     this.audioFilter = audioFilter;
+    this.streamAddress = streamAddress;
   }
 
   async handleSnapshotRequest(
@@ -157,8 +167,28 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
 
     const videoSSRC = this.hap.CameraController.generateSynchronisationSource();
     const audioSSRC = this.hap.CameraController.generateSynchronisationSource();
+    const ipv6 = request.addressVersion === 'ipv6';
+    const defaultAddress = await getDefaultIpAddress(ipv6);
+    const selected = ipv6
+      ? undefined
+      : selectStreamAddress(
+          request.targetAddress,
+          networkInterfaces(),
+          this.streamAddress,
+          defaultAddress
+        );
+    const sourceAddress = selected?.address ?? defaultAddress;
+    const localAddress = ipv6
+      ? undefined
+      : rtpLocalAddress(sourceAddress, defaultAddress);
+    if (localAddress && !this.hideRoutineLogs) {
+      this.log.info(
+        `${this.blinkCamera.name} - LiveView source ${localAddress} (${selected?.reason}); default route is ${defaultAddress}`
+      );
+    }
     const sessionInfo: SessionInfo = {
       address: request.targetAddress,
+      localAddress,
       videoPort: request.video.port,
       videoCryptoSuite: request.video.srtpCryptoSuite,
       videoSRTP: Buffer.concat([
@@ -185,9 +215,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       : undefined;
 
     const response: PrepareStreamResponse = {
-      addressOverride: await getDefaultIpAddress(
-        request.addressVersion === 'ipv6'
-      ),
+      addressOverride: sourceAddress,
       video: {
         port: request.video.port,
         ssrc: videoSSRC,
@@ -495,7 +523,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     }
 
     ffmpegArgs.push(
-      `${targetProtocol}://${address}:${videoPort}?rtcpport=${videoPort}&pkt_size=${video.mtu}`
+      rtpOutputUrl(
+        targetProtocol,
+        address,
+        videoPort,
+        video.mtu,
+        sessionInfo.localAddress
+      )
     );
 
     // Audio output — transcode AAC from camera to OPUS for HomeKit
@@ -547,7 +581,13 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
       }
 
       ffmpegArgs.push(
-        `${audioProtocol}://${address}:${audioPort}?rtcpport=${audioPort}&pkt_size=188`
+        rtpOutputUrl(
+          audioProtocol,
+          address,
+          audioPort,
+          188,
+          sessionInfo.localAddress
+        )
       );
     }
 
