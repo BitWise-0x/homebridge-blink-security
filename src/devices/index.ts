@@ -1113,7 +1113,9 @@ export class Blink {
       cameras.map(async camera => {
         const ttl = force ? 500 : this.snapshotRate * 1000;
         const lastSnapshot = camera.thumbnailCreatedAt + ttl;
-        const eligible = force || (camera.armed && camera.enabled);
+        // Arm state deliberately does not gate this: hiding thumbnails while
+        // disarmed is what the per-camera privacy switch is for.
+        const eligible = force || camera.enabled;
 
         if (eligible && Date.now() >= lastSnapshot) {
           if (camera.lowBattery || !camera.online) {
@@ -1324,7 +1326,7 @@ export class Blink {
 
     const ttl = force ? 500 : this.snapshotRate * 1000;
     const lastSnapshot = doorbell.thumbnailCreatedAt + ttl;
-    const eligible = force || (doorbell.armed && doorbell.enabled);
+    const eligible = force || doorbell.enabled;
 
     if (eligible && Date.now() >= lastSnapshot) {
       if (!doorbell.online) {

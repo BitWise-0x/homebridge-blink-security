@@ -58,7 +58,7 @@
       "hide-privacy-switch": {
         "title": "Hide Camera Privacy-Mode Enable/Disable Switch",
         "placeholder": false,
-        "description": "Privacy-Mode prevents thumbnails from refreshing when the Security System is not armed. Disabling this switch will globally disable privacy-mode on all cameras.",
+        "description": "Privacy-Mode hides the camera's thumbnail in HomeKit while its switch is on, whether or not the Security System is armed. Disabling this switch will globally disable privacy-mode on all cameras.",
         "type": "boolean"
       },
       "hide-cameras": {
@@ -88,7 +88,7 @@
       "disable-thumbnail-refresh": {
         "title": "Disable thumbnail auto-refresh",
         "default": false,
-        "description": "By default, the thumbnails of the cameras will refresh when the camera is enabled, disabling the auto refresh keeps the default thumbnail untouched.",
+        "description": "By default, the thumbnails of cameras with motion detection enabled refresh whether or not the Security System is armed. Disabling the auto refresh stops these scheduled refreshes; a thumbnail is still refreshed after a live view ends.",
         "type": "boolean"
       },
       "blink-status-polling-seconds": {
@@ -105,7 +105,7 @@
         "type": "integer",
         "minimum": 0,
         "placeholder": "3600",
-        "description": "Minimum interval (seconds) between Blink cloud thumbnail refreshes per camera. Controls how often the plugin asks a camera to capture a new thumbnail — not how often HomeKit displays them. HomeKit's own snapshot polling (~10s while the Home app is foregrounded, ~60s backgrounded) is served from cache between refreshes. Default 3600. Ignored if auto refresh is disabled."
+        "description": "Minimum interval (seconds) between Blink cloud thumbnail refreshes per camera. Controls how often the plugin asks a camera to capture a new thumbnail — not how often HomeKit displays them. HomeKit's own snapshot polling (~10s while the Home app is foregrounded, ~60s backgrounded) is served from cache between refreshes. Scheduled refreshes only happen while HomeKit is requesting snapshots, for cameras with motion detection enabled, armed or disarmed. Default 3600. Ignored if auto refresh is disabled."
       },
       "camera-status-polling-seconds": {
         "title": "Camera Status Polling (seconds)",
