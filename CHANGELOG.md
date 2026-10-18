@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.3...v2.0.4) (2026-10-18)
+
+### Bug Fixes
+
+* **thumbnails:** refresh thumbnails while the system is disarmed ([255780b](https://github.com/BitWise-0x/homebridge-blink-security/commit/255780b165a46e70c982177170088dc5462dc10b)), closes [#84](https://github.com/BitWise-0x/homebridge-blink-security/issues/84)
+
 ## [2.0.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.2...v2.0.3) (2026-10-14)
 
 ### Bug Fixes
