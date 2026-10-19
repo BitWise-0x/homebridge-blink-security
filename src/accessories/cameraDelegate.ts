@@ -75,6 +75,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly liveViewEnabled: boolean;
   private readonly audioEnabled: boolean;
   private readonly audioFilter: string;
+  private readonly transcodeImmi: boolean;
   private readonly streamAddress: string;
   private readonly hideRoutineLogs: boolean;
   controller?: CameraController;
@@ -105,7 +106,8 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     audioEnabled = false,
     hideRoutineLogs = false,
     audioFilter = '',
-    streamAddress = ''
+    streamAddress = '',
+    transcodeImmi = false
   ) {
     this.blinkCamera = blinkCamera;
     this.log = log;
@@ -115,6 +117,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     this.hideRoutineLogs = hideRoutineLogs;
     this.audioFilter = audioFilter;
     this.streamAddress = streamAddress;
+    this.transcodeImmi = transcodeImmi;
   }
 
   async handleSnapshotRequest(
@@ -415,12 +418,48 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-i',
         'pipe:0',
         '-map',
-        '0:v',
-        '-vcodec',
-        'copy',
-        '-sn',
-        '-dn'
+        '0:v'
       );
+      if (this.transcodeImmi) {
+        // Re-encode instead of passing the camera's H.264 through: Blink
+        // cameras send sparse keyframes and their own bitrate, so after any
+        // packet loss HomeKit stalls (spinner) until the next keyframe and
+        // ignores the bitrate/resolution it negotiated. Re-encoding gives a
+        // keyframe every 2s at the size and bitrate HomeKit asked for.
+        ffmpegArgs.push(
+          '-c:v',
+          'libx264',
+          '-preset',
+          'ultrafast',
+          '-tune',
+          'zerolatency',
+          '-pix_fmt',
+          'yuv420p',
+          '-profile:v',
+          'baseline',
+          '-vf',
+          `scale=${video.width}:${video.height}:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2`,
+          // Keep the camera's own frame rate (Blink sends fewer than the 30
+          // fps HomeKit asks for); duplicating frames would only split the
+          // small bitrate budget across copies. Keyframes are time-based so
+          // they stay 2s apart whatever the source rate.
+          '-fps_mode',
+          'passthrough',
+          '-force_key_frames',
+          'expr:gte(t,n_forced*2)',
+          '-sc_threshold',
+          '0',
+          '-b:v',
+          `${maxBitrate}k`,
+          '-maxrate',
+          `${maxBitrate}k`,
+          '-bufsize',
+          `${2 * maxBitrate}k`
+        );
+      } else {
+        ffmpegArgs.push('-vcodec', 'copy');
+      }
+      ffmpegArgs.push('-sn', '-dn');
     } else if (rtspProxy?.isRtsp && rtspProxy.proxyServer) {
       // RTSPS via RTSP-to-MPEGTS proxy — the proxy handles RTSP negotiation,
       // strips interleaved framing and RTP headers, serves raw MPEG-TS over TCP.
