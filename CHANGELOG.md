@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.4...v2.0.5) (2026-10-19)
+
+### Bug Fixes
+
+* **thumbnails:** keep the last good thumbnail when a fetch fails ([dda41e6](https://github.com/BitWise-0x/homebridge-blink-security/commit/dda41e64805da5d3417266069826460972c432e9)), closes [#84](https://github.com/BitWise-0x/homebridge-blink-security/issues/84)
+* **thumbnails:** stop re-sending a failed thumbnail capture ([5145f7c](https://github.com/BitWise-0x/homebridge-blink-security/commit/5145f7c18e1131147eec6908b94e20e52ec699d1)), closes [#84](https://github.com/BitWise-0x/homebridge-blink-security/issues/84)
+
 ## [2.0.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.3...v2.0.4) (2026-10-18)
 
 ### Bug Fixes
