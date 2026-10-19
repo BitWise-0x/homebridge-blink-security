@@ -224,3 +224,98 @@ describe('BlinkCamera.getMotionDetected with local storage events', () => {
     });
   });
 });
+
+describe('BlinkCamera.getThumbnail', () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+
+  function makeThumbCamera(thumbnail: string): {
+    camera: BlinkCamera;
+    getBinary: ReturnType<typeof vi.fn>;
+  } {
+    const data: HomescreenCamera = {
+      id: 42,
+      network_id: 100,
+      name: 'Patio',
+      serial: 'TEST0042',
+      fw_version: '1.0.0',
+      type: 'xt',
+      enabled: true,
+      thumbnail,
+      status: 'online',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+    const getBinary = vi.fn();
+    const blink = {
+      api: { getBinary },
+      log: { debug: vi.fn() },
+    } as unknown as Blink;
+    return { camera: new BlinkCamera(data, blink), getBinary };
+  }
+
+  function nextUrl(camera: BlinkCamera, url: string): void {
+    camera.data = { ...camera.data, thumbnail: url };
+  }
+
+  it('serves and caches a fetched JPEG', async () => {
+    const { camera, getBinary } = makeThumbCamera('/thumb.jpg?ts=1');
+    getBinary.mockResolvedValue(JPEG);
+    await expect(camera.getThumbnail()).resolves.toBe(JPEG);
+    await expect(camera.getThumbnail()).resolves.toBe(JPEG);
+    expect(getBinary).toHaveBeenCalledOnce();
+  });
+
+  // Regression for issue #84: right after a capture, Blink can publish the
+  // new thumbnail URL before it serves the image there. Whatever comes back
+  // instead must not replace the last good image in the Home app.
+  it('keeps the last good image when a new URL fails to fetch', async () => {
+    const { camera, getBinary } = makeThumbCamera('/thumb.jpg?ts=1');
+    getBinary.mockResolvedValueOnce(JPEG);
+    await camera.getThumbnail();
+
+    nextUrl(camera, '/thumb.jpg?ts=2');
+    getBinary.mockRejectedValueOnce(new Error('GET /thumb.jpg?ts=2 (404)'));
+    await expect(camera.getThumbnail()).resolves.toBe(JPEG);
+  });
+
+  it('keeps the last good image when a new URL returns something other than a JPEG', async () => {
+    const { camera, getBinary } = makeThumbCamera('/thumb.jpg?ts=1');
+    getBinary.mockResolvedValueOnce(JPEG);
+    await camera.getThumbnail();
+
+    nextUrl(camera, '/thumb.jpg?ts=2');
+    getBinary.mockResolvedValueOnce(Buffer.from('{"message":"not ready"}'));
+    await expect(camera.getThumbnail()).resolves.toBe(JPEG);
+    getBinary.mockResolvedValueOnce(Buffer.alloc(0));
+    await expect(camera.getThumbnail()).resolves.toBe(JPEG);
+  });
+
+  it('retries a URL that returned a bad body instead of caching it', async () => {
+    const { camera, getBinary } = makeThumbCamera('/thumb.jpg?ts=2');
+    const fresh = Buffer.from([0xff, 0xd8, 0xff, 0xe1, 0x00, 0x20]);
+    getBinary.mockResolvedValueOnce(Buffer.alloc(0));
+    getBinary.mockResolvedValueOnce(fresh);
+    await expect(camera.getThumbnail()).resolves.toBeUndefined();
+    await expect(camera.getThumbnail()).resolves.toBe(fresh);
+  });
+
+  it('keeps the last good image after the thumbnail cache is cleared', async () => {
+    const { camera, getBinary } = makeThumbCamera('/thumb.jpg?ts=1');
+    getBinary.mockResolvedValueOnce(JPEG);
+    await camera.getThumbnail();
+    camera.clearThumbnailCache();
+
+    getBinary.mockRejectedValueOnce(new Error('GET /thumb.jpg?ts=1 (404)'));
+    await expect(camera.getThumbnail()).resolves.toBe(JPEG);
+    // The 404 blanked the URL until the next poll; still the last good image.
+    await expect(camera.getThumbnail()).resolves.toBe(JPEG);
+  });
+
+  it('serves nothing in privacy mode, even with a last good image', async () => {
+    const { camera, getBinary } = makeThumbCamera('/thumb.jpg?ts=1');
+    getBinary.mockResolvedValueOnce(JPEG);
+    await camera.getThumbnail();
+    camera.privacyMode = true;
+    await expect(camera.getThumbnail()).resolves.toBeUndefined();
+  });
+});

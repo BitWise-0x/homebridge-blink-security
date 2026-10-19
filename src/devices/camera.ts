@@ -11,6 +11,10 @@ import { fahrenheitToCelsius } from '../lib/utils.js';
 // the homescreen `owls` array — see `isOwlDevice`.
 export const KNOWN_OWL_CODENAMES = ['owl', 'hawk', 'superior', 'chickadee'];
 
+function isJpeg(data: Buffer): boolean {
+  return data.length > 3 && data[0] === 0xff && data[1] === 0xd8;
+}
+
 export class BlinkCamera extends BlinkDevice {
   readonly id: number;
   blink: Blink;
@@ -26,6 +30,9 @@ export class BlinkCamera extends BlinkDevice {
   // unchanged) is not re-sent on every HomeKit snapshot request; see
   // THUMBNAIL_RETRY.
   lastThumbnailRequest = 0;
+  // The newest image actually served, kept apart from the per-URL cache so
+  // clearing that cache (after a live view) never leaves nothing to show.
+  private lastGoodThumbnail?: Buffer;
 
   constructor(data: HomescreenCamera, blink: Blink, isOwlDevice = false) {
     super(data);
@@ -294,7 +301,7 @@ export class BlinkCamera extends BlinkDevice {
     let thumbnailUrl = this.thumbnail;
     if (!thumbnailUrl) {
       this.blink.log.debug(`${this.name} - Thumbnail skipped: no URL`);
-      return undefined;
+      return this.lastGoodThumbnail;
     }
 
     if (includeMotion) {
@@ -324,17 +331,21 @@ export class BlinkCamera extends BlinkDevice {
       if (this.data.thumbnail === thumbnailUrl) {
         (this.data as HomescreenCamera).thumbnail = '';
       }
-      return undefined;
+      return this.lastGoodThumbnail;
     }
-    // Only cache non-empty results — 0-byte responses should be retried
-    if (data.length > 0) {
-      this.cacheThumbnail.clear();
-      this.cacheThumbnail.set(thumbnailUrl, data);
-    } else {
+    // Only cache real images. Anything else (empty, or a body that is not a
+    // JPEG) is retried on the next request, and HomeKit keeps the last good
+    // image meanwhile: an empty buffer is an error to HomeKit, and a body it
+    // cannot decode shows as a black tile.
+    if (!isJpeg(data)) {
       this.blink.log.debug(
-        `${this.name} - Thumbnail returned 0 bytes, not caching`
+        `${this.name} - Thumbnail is not a JPEG (${data.length} bytes), not caching`
       );
+      return this.lastGoodThumbnail;
     }
+    this.cacheThumbnail.clear();
+    this.cacheThumbnail.set(thumbnailUrl, data);
+    this.lastGoodThumbnail = data;
     return data;
   }
 
