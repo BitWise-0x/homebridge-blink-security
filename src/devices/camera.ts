@@ -21,6 +21,11 @@ export class BlinkCamera extends BlinkDevice {
   private cacheThumbnail = new Map<string, Buffer>();
   // Last logged motion decision, so the poll loop only logs transitions.
   private motionTrace = '';
+  // When a thumbnail refresh was last requested. Kept outside `data`, which
+  // each poll replaces, so a capture that fails (and leaves the URL's `ts`
+  // unchanged) is not re-sent on every HomeKit snapshot request; see
+  // THUMBNAIL_RETRY.
+  lastThumbnailRequest = 0;
 
   constructor(data: HomescreenCamera, blink: Blink, isOwlDevice = false) {
     super(data);

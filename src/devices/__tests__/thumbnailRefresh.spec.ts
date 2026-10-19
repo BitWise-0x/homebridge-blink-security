@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Blink } from '../index.js';
+import { Blink, THUMBNAIL_RETRY } from '../index.js';
 import { DEFAULT_OPTIONS } from '../../lib/config.js';
 import type { BlinkAuthClient } from '../../lib/auth.js';
 import type { Logger } from 'homebridge';
@@ -57,8 +57,10 @@ async function makeBlink(
     doorbell_buttons: [],
     sirens: [],
   };
+  // A fresh copy per fetch, as the real API returns: anything the plugin
+  // writes into device data must not survive a poll.
   const api = {
-    getAccountHomescreen: vi.fn().mockResolvedValue(homescreen),
+    getAccountHomescreen: vi.fn(async () => structuredClone(homescreen)),
     getMediaChange: vi.fn().mockResolvedValue({ media: [] }),
     probeDoorbellConfig: vi.fn().mockResolvedValue(undefined),
     lock: vi.fn((_name: string, fn: () => Promise<unknown>) => fn()),
@@ -108,6 +110,32 @@ describe('Blink.refreshCameraThumbnail scheduled refresh', () => {
     await blink.refreshCameraThumbnail(100, 42);
     expect(api.updateCameraThumbnail).not.toHaveBeenCalled();
   });
+
+  // A failed capture leaves the thumbnail URL's `ts` unchanged, and the poll
+  // that follows replaces device data, so the attempt time must be kept
+  // elsewhere or the command is re-sent on every HomeKit snapshot request.
+  it('does not re-send a failed capture before the interval has elapsed', async () => {
+    const { blink, api } = await makeBlink(false, {
+      cameras: [makeDevice('catalina')],
+    });
+    api.command.mockResolvedValue(undefined);
+    await blink.refreshCameraThumbnail(100, 42);
+    await blink.refreshCameraThumbnail(100, 42);
+    expect(api.command).toHaveBeenCalledOnce();
+  });
+
+  // ...but one transient failure must not hold off the next attempt for a
+  // whole TTL either.
+  it('retries a failed capture once the retry window has passed', async () => {
+    const { blink, api } = await makeBlink(false, {
+      cameras: [makeDevice('catalina')],
+    });
+    api.command.mockResolvedValue(undefined);
+    await blink.refreshCameraThumbnail(100, 42);
+    blink.cameras.get(42)!.lastThumbnailRequest -= THUMBNAIL_RETRY * 1000;
+    await blink.refreshCameraThumbnail(100, 42);
+    expect(api.command).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('Blink.refreshDoorbellThumbnail scheduled refresh', () => {
@@ -117,6 +145,16 @@ describe('Blink.refreshDoorbellThumbnail scheduled refresh', () => {
     });
     await blink.refreshDoorbellThumbnail(100, 42);
     expect(api.updateDoorbellThumbnail).toHaveBeenCalledOnce();
+  });
+
+  it('does not re-send a failed doorbell capture before the interval has elapsed', async () => {
+    const { blink, api } = await makeBlink(false, {
+      doorbells: [makeDevice('lotus')],
+    });
+    api.command.mockResolvedValue(undefined);
+    await blink.refreshDoorbellThumbnail(100, 42);
+    await blink.refreshDoorbellThumbnail(100, 42);
+    expect(api.command).toHaveBeenCalledOnce();
   });
 
   it('does not refresh a doorbell with motion detection disabled', async () => {

@@ -33,6 +33,10 @@ export { BlinkDoorbell } from './doorbell.js';
 export { BlinkSiren } from './siren.js';
 
 export const THUMBNAIL_TTL = 60 * 60;
+// Wait after a thumbnail request whose capture did not land (the URL's `ts`
+// never advanced), so one transient failure neither hammers Blink on every
+// HomeKit snapshot request nor holds off the next attempt for a full TTL.
+export const THUMBNAIL_RETRY = 5 * 60;
 export const MOTION_POLL = 15;
 export const STATUS_POLL = 20;
 export const ARMED_DELAY = 60;
@@ -1100,6 +1104,14 @@ export class Blink {
     await this.refreshData(true);
   }
 
+  /** When a device next becomes due for a thumbnail refresh. */
+  private nextThumbnailRefresh(device: BlinkCamera, ttl: number): number {
+    return Math.max(
+      device.thumbnailCreatedAt + ttl,
+      device.lastThumbnailRequest + Math.min(ttl, THUMBNAIL_RETRY * 1000)
+    );
+  }
+
   async refreshCameraThumbnail(
     networkID?: number,
     cameraID?: number,
@@ -1112,7 +1124,7 @@ export class Blink {
     const status = await Promise.all(
       cameras.map(async camera => {
         const ttl = force ? 500 : this.snapshotRate * 1000;
-        const lastSnapshot = camera.thumbnailCreatedAt + ttl;
+        const lastSnapshot = this.nextThumbnailRefresh(camera, ttl);
         // Arm state deliberately does not gate this: hiding thumbnails while
         // disarmed is what the per-camera privacy switch is for.
         const eligible = force || camera.enabled;
@@ -1128,6 +1140,7 @@ export class Blink {
           }
 
           camera.thumbnailCreatedAt = Date.now();
+          camera.lastThumbnailRequest = camera.thumbnailCreatedAt;
 
           routineInfo(
             this.log,
@@ -1325,7 +1338,7 @@ export class Blink {
     }
 
     const ttl = force ? 500 : this.snapshotRate * 1000;
-    const lastSnapshot = doorbell.thumbnailCreatedAt + ttl;
+    const lastSnapshot = this.nextThumbnailRefresh(doorbell, ttl);
     const eligible = force || doorbell.enabled;
 
     if (eligible && Date.now() >= lastSnapshot) {
@@ -1339,6 +1352,7 @@ export class Blink {
       }
 
       doorbell.thumbnailCreatedAt = Date.now();
+      doorbell.lastThumbnailRequest = doorbell.thumbnailCreatedAt;
 
       routineInfo(
         this.log,
