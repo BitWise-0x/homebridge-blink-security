@@ -20,6 +20,12 @@ const TOKEN_WAIT_WARN_MS = 1000;
 // Well under the 30s axios timeout so a stall is visible before it trips.
 const SLOW_REQUEST_WARN_MS = 5000;
 
+// Transient network failures worth retrying. EAI_AGAIN is a temporary DNS
+// resolver failure (common on Raspberry Pi / mesh routers): the request never
+// left the host, so retrying is safe for every method.
+const TRANSIENT_NETWORK_ERROR =
+  /ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|EPIPE|socket hang up/;
+
 /** A response Blink answered with an error status, after any retries. */
 export class BlinkHttpError extends Error {
   constructor(
@@ -194,10 +200,16 @@ export class BlinkClient {
         );
       }
     } catch (err) {
-      const error = err as Error;
-      if (/ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT/.test(error.message)) {
+      const error = err as Error & { code?: string };
+      if (
+        TRANSIENT_NETWORK_ERROR.test(error.message) ||
+        (error.code !== undefined && TRANSIENT_NETWORK_ERROR.test(error.code))
+      ) {
         if (retryCount < 2) {
           const backoffMs = Math.pow(2, retryCount) * 1000;
+          this.log.warn(
+            `RETRY: ${method} ${resolvedPath} (${error.code ?? error.message}) — retrying in ${backoffMs}ms`
+          );
           await sleep(backoffMs);
           return this._request<T>(
             method,
