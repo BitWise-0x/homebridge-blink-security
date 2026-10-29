@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.6...v2.0.7) (2026-10-29)
+
+### Bug Fixes
+
+* **engines:** support Node.js 26 ([d6e2272](https://github.com/BitWise-0x/homebridge-blink-security/commit/d6e22726c57cb6d7b5b6740760f63e05602fb5fe)), closes [#90](https://github.com/BitWise-0x/homebridge-blink-security/issues/90)
+
 ## [2.0.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.5...v2.0.6) (2026-10-21)
 
 ### Bug Fixes
