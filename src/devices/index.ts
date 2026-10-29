@@ -22,6 +22,7 @@ import {
   toAlphanumeric,
   DOORBELL_PRESS_SOURCES,
   MAX_CLIP_FUTURE_SKEW_MS,
+  NON_MOTION_SOURCES,
   type LocalStoragePollState,
 } from './localStorage.js';
 import { ExponentialBackoff } from '../lib/utils.js';
@@ -330,7 +331,7 @@ export class Blink {
     // Use thumbnail from config if available, otherwise check recent
     // media for a newer one (e.g. after a post-stream thumbnail refresh).
     let thumbnail = (raw.thumbnail as string) || current.thumbnail;
-    const lastMedia = await this.getCameraLastMotion(
+    const lastMedia = await this.getCameraLastMedia(
       doorbell.networkID,
       doorbell.cameraID
     ).catch(() => undefined);
@@ -1213,11 +1214,25 @@ export class Blink {
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   }
 
-  async getCameraLastMotion(
+  /** Newest media entry of any kind, for thumbnails. */
+  async getCameraLastMedia(
     networkID: number,
     cameraID?: number
   ): Promise<MediaEntry | undefined> {
     return (await this.getMergedMedia(networkID, cameraID))[0];
+  }
+
+  /**
+   * Newest motion entry. Non-motion captures are skipped rather than ending
+   * the search, so a snapshot posted after a real motion clip does not hide
+   * it. An entry with no source stays motion, as it always has.
+   */
+  async getCameraLastMotion(
+    networkID: number,
+    cameraID?: number
+  ): Promise<MediaEntry | undefined> {
+    const media = await this.getMergedMedia(networkID, cameraID);
+    return media.find(m => !m.source || !NON_MOTION_SOURCES.includes(m.source));
   }
 
   /**
@@ -1254,7 +1269,7 @@ export class Blink {
       return camera.thumbnail;
     }
 
-    const latestMedia = await this.getCameraLastMotion(networkID, cameraID);
+    const latestMedia = await this.getCameraLastMedia(networkID, cameraID);
     if (
       latestMedia?.created_at &&
       Date.parse(latestMedia.created_at) > camera.thumbnailCreatedAt
