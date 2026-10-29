@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.8...v2.0.9) (2026-10-29)
+
+### Bug Fixes
+
+* **motion:** ignore snapshot media when detecting motion ([af59fec](https://github.com/BitWise-0x/homebridge-blink-security/commit/af59fecf59d0d362f57b5fe7d70156a6124d9374))
+
 ## [2.0.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.7...v2.0.8) (2026-10-29)
 
 ### Bug Fixes
