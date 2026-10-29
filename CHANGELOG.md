@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.7...v2.0.8) (2026-10-29)
+
+### Bug Fixes
+
+* **deps:** pin systeminformation to 5.33.18 ([bc3bf8b](https://github.com/BitWise-0x/homebridge-blink-security/commit/bc3bf8b4f3b084fa1b9b8c6b69f2130f19d6959e))
+
 ## [2.0.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.6...v2.0.7) (2026-10-29)
 
 ### Bug Fixes
