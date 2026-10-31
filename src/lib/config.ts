@@ -30,6 +30,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'stream-address'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
   'enable-push-notifications'?: boolean;
+  'push-sign-in-callback'?: string;
 }
 
 export type LocalStorageMotionMode = 'auto' | 'always' | 'never';
@@ -63,6 +64,7 @@ export interface BlinkOptions {
   hideRoutineLogs: boolean;
   localStorageMotion: LocalStorageMotionMode;
   pushNotifications: boolean;
+  pushSignInCallback?: string;
 }
 
 export const DEFAULT_OPTIONS: BlinkOptions = {
@@ -186,6 +188,14 @@ export function normalizeConfig(
   opts.hideRoutineLogs = config.logging === 'quiet';
   opts.verbose = ['verbose', 'debug'].includes(config.logging ?? '');
   opts.debug = config.logging === 'debug';
+
+  const pushCallback =
+    typeof config['push-sign-in-callback'] === 'string'
+      ? config['push-sign-in-callback'].trim()
+      : '';
+  if (pushCallback) {
+    opts.pushSignInCallback = pushCallback;
+  }
 
   const lsMotion = config['local-storage-motion'];
   if (lsMotion && ['auto', 'always', 'never'].includes(lsMotion)) {

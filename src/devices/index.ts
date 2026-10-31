@@ -30,7 +30,7 @@ import {
   BlinkPushListener,
   isDoorbellPress,
   type BlinkPushEvent,
-  type ReceiverFactory,
+  type PushListenerOptions,
 } from '../lib/push.js';
 
 export { BlinkDevice } from './base.js';
@@ -151,17 +151,16 @@ export class Blink {
    */
   async startPushNotifications(
     storagePath: string,
-    receiverFactory?: ReceiverFactory
+    options: PushListenerOptions = {}
   ): Promise<void> {
     if (this.pushListener) {
       return;
     }
     this.pushListener = new BlinkPushListener(
-      this.api,
       this.log,
       storagePath,
       event => this.handlePushEvent(event),
-      receiverFactory
+      options
     );
     await this.pushListener.start();
   }

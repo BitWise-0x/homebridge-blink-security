@@ -12,7 +12,11 @@ import {
   parseBlinkPush,
   type ReceiverFactory,
 } from '../push.js';
-import type { BlinkApi } from '../api.js';
+import {
+  newSignInPending,
+  type PushHttp,
+  type PushSessionData,
+} from '../pushAuth.js';
 import { Blink } from '../../devices/index.js';
 import { BlinkDoorbell } from '../../devices/doorbell.js';
 import { DEFAULT_OPTIONS } from '../config.js';
@@ -265,6 +269,30 @@ describe('BlinkPushListener', () => {
     vi.useRealTimers();
   });
 
+  const session: PushSessionData = {
+    hardwareId: 'HW',
+    accessToken: 'access',
+    refreshToken: 'refresh',
+    expiresAt: Date.now() + 3_600_000,
+    tier: 'e006',
+    accountId: 1234,
+    clientId: '987',
+  };
+
+  function writeState(state: Record<string, unknown>) {
+    fs.mkdirSync(path.join(dir, 'blink'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'blink', 'push.json'),
+      JSON.stringify(state)
+    );
+  }
+
+  function readState() {
+    return JSON.parse(
+      fs.readFileSync(path.join(dir, 'blink', 'push.json'), 'utf8')
+    );
+  }
+
   function fakeReceiver(token = 'fcm-token') {
     const handlers: {
       creds?: (d: { newCredentials: unknown }) => void;
@@ -281,62 +309,145 @@ describe('BlinkPushListener', () => {
     return { receiver, handlers };
   }
 
-  function fakeApi() {
-    return {
-      getClientId: vi.fn().mockResolvedValue('987'),
-      updateClientNotificationKey: vi.fn().mockResolvedValue(undefined),
-      sendNotificationReceipt: vi.fn().mockResolvedValue(undefined),
-    };
+  function fakeHttp(status = 200) {
+    const calls: Array<{ method: string; url: string; json?: unknown }> = [];
+    const http = vi.fn(
+      async (req: { method: string; url: string; json?: unknown }) => {
+        calls.push(req);
+        return { status, data: {}, headers: {} };
+      }
+    );
+    return { http: http as unknown as PushHttp, calls };
   }
 
-  it('connects, then registers the token with this session client', async () => {
+  it('asks for a sign-in, with a link, when there is no push session', async () => {
     const { receiver } = fakeReceiver();
-    const api = fakeApi();
-    const factory = vi.fn(() => receiver) as unknown as ReceiverFactory;
-    const listener = new BlinkPushListener(
-      api as unknown as BlinkApi,
-      makeLog(),
-      dir,
-      vi.fn(),
-      factory
-    );
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http: fakeHttp().http,
+    });
     await listener.start();
+    expect(receiver.connect).not.toHaveBeenCalled();
+    const warning = String(vi.mocked(log.warn).mock.calls[0][0]);
+    expect(warning).toContain(
+      'https://api.oauth.blink.com/oauth/v2/authorize?'
+    );
+    expect(warning).toContain('client_id=android');
+    expect(readState().pending.state).toBeTruthy();
+  });
+
+  it('keeps the same sign-in link across restarts until it is used', async () => {
+    const make = () =>
+      new BlinkPushListener(makeLog(), dir, vi.fn(), {
+        receiverFactory: (() =>
+          fakeReceiver().receiver) as unknown as ReceiverFactory,
+        http: fakeHttp().http,
+      });
+    await make().start();
+    const first = readState().pending.state;
+    await make().start();
+    expect(readState().pending.state).toBe(first);
+  });
+
+  it('finishes the sign-in from the callback address, then connects', async () => {
+    const pending = newSignInPending();
+    writeState({ pending });
+    const { receiver } = fakeReceiver();
+    const http = vi.fn(async (req: { url: string }) => {
+      if (req.url.endsWith('/oauth/token')) {
+        return {
+          status: 200,
+          data: { access_token: 'a', refresh_token: 'r', expires_in: 3600 },
+          headers: {},
+        };
+      }
+      if (req.url.endsWith('/tier_info')) {
+        return {
+          status: 200,
+          data: { tier: 'e006', account_id: 1234 },
+          headers: {},
+        };
+      }
+      if (req.url.endsWith('/homescreen')) {
+        return { status: 200, data: {}, headers: { 'client-id': '555' } };
+      }
+      return { status: 200, data: {}, headers: {} };
+    });
+    const listener = new BlinkPushListener(makeLog(), dir, vi.fn(), {
+      signInCallback: `https://applinks.blink.com/signin/callback?code=C0DE&state=${pending.state}`,
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http: http as unknown as PushHttp,
+    });
+    await listener.start();
+    expect(listener.signedIn).toBe(true);
     expect(receiver.connect).toHaveBeenCalled();
-    expect(api.updateClientNotificationKey).toHaveBeenCalledWith(
-      '987',
-      'fcm-token',
-      PUSH_CLIENT_NAME
+    expect(http).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://rest-e006.immedia-semi.com/clients/555/update',
+        json: expect.objectContaining({ notification_key: 'fcm-token' }),
+      })
+    );
+    const saved = readState();
+    expect(saved.pending).toBeUndefined();
+    expect(saved.session.clientId).toBe('555');
+    listener.stop();
+  });
+
+  it('ignores a callback address from another sign-in attempt', async () => {
+    writeState({ pending: newSignInPending() });
+    const { http } = fakeHttp();
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      signInCallback:
+        'https://applinks.blink.com/signin/callback?code=C0DE&state=someone-else',
+      receiverFactory: (() =>
+        fakeReceiver().receiver) as unknown as ReceiverFactory,
+      http,
+    });
+    await listener.start();
+    expect(listener.signedIn).toBe(false);
+    expect(http).not.toHaveBeenCalled();
+  });
+
+  it('registers the token with the push session client', async () => {
+    writeState({ session });
+    const { receiver } = fakeReceiver();
+    const { http, calls } = fakeHttp();
+    const listener = new BlinkPushListener(makeLog(), dir, vi.fn(), {
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http,
+    });
+    await listener.start();
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        method: 'POST',
+        url: 'https://rest-e006.immedia-semi.com/clients/987/update',
+        json: expect.objectContaining({
+          notification_key: 'fcm-token',
+          client_name: PUSH_CLIENT_NAME,
+        }),
+      })
     );
     listener.stop();
     expect(receiver.destroy).toHaveBeenCalled();
   });
 
-  it('persists credentials and reuses them on the next start', async () => {
+  it('persists push credentials and reuses them on the next start', async () => {
+    writeState({ session });
     const first = fakeReceiver();
-    const api = fakeApi();
     const configs: unknown[] = [];
     const factory = ((config: unknown) => {
       configs.push(config);
       return first.receiver;
     }) as unknown as ReceiverFactory;
-    const listener = new BlinkPushListener(
-      api as unknown as BlinkApi,
-      makeLog(),
-      dir,
-      vi.fn(),
-      factory
-    );
+    const opts = { receiverFactory: factory, http: fakeHttp().http };
+    const listener = new BlinkPushListener(makeLog(), dir, vi.fn(), opts);
     await listener.start();
     first.handlers.creds?.({ newCredentials: { fcm: { token: 'fcm-token' } } });
     listener.stop();
 
-    const again = new BlinkPushListener(
-      api as unknown as BlinkApi,
-      makeLog(),
-      dir,
-      vi.fn(),
-      factory
-    );
+    const again = new BlinkPushListener(makeLog(), dir, vi.fn(), opts);
     await again.start();
     expect(configs[1]).toMatchObject({
       credentials: { fcm: { token: 'fcm-token' } },
@@ -345,16 +456,14 @@ describe('BlinkPushListener', () => {
   });
 
   it('delivers parsed events, records ids and sends requested receipts', async () => {
+    writeState({ session });
     const { receiver, handlers } = fakeReceiver();
-    const api = fakeApi();
+    const { http, calls } = fakeHttp();
     const onEvent = vi.fn();
-    const listener = new BlinkPushListener(
-      api as unknown as BlinkApi,
-      makeLog(),
-      dir,
-      onEvent,
-      (() => receiver) as unknown as ReceiverFactory
-    );
+    const listener = new BlinkPushListener(makeLog(), dir, onEvent, {
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http,
+    });
     await listener.start();
     handlers.note?.(
       envelope(
@@ -370,33 +479,48 @@ describe('BlinkPushListener', () => {
     expect(onEvent).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'button_press' })
     );
-    expect(api.sendNotificationReceipt).toHaveBeenCalledWith('tx-9');
-    const saved = JSON.parse(
-      fs.readFileSync(path.join(dir, 'blink', 'push.json'), 'utf8')
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        url: 'https://rest-e006.immedia-semi.com/api/v2/notification',
+        json: { transaction_id: 'tx-9', status: 'RECEIVED' },
+      })
     );
-    expect(saved.persistentIds).toEqual(['persist-1']);
+    expect(readState().persistentIds).toEqual(['persist-1']);
     listener.stop();
+  });
+
+  it('asks for a new sign-in when Blink ends the push session', async () => {
+    writeState({ session: { ...session, expiresAt: 0 } });
+    const { http } = fakeHttp(401);
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      receiverFactory: (() =>
+        fakeReceiver().receiver) as unknown as ReceiverFactory,
+      http,
+    });
+    await listener.start();
+    expect(listener.signedIn).toBe(false);
+    expect(String(vi.mocked(log.warn).mock.calls.at(-1)?.[0])).toContain(
+      'one-time sign-in'
+    );
   });
 
   it('retries with backoff when the first connection fails', async () => {
     vi.useFakeTimers();
+    writeState({ session });
     const failing = fakeReceiver();
     failing.receiver.connect.mockRejectedValueOnce(new Error('offline'));
-    const api = fakeApi();
-    const factory = vi.fn(() => failing.receiver) as unknown as ReceiverFactory;
+    const { http, calls } = fakeHttp();
     const log = makeLog();
-    const listener = new BlinkPushListener(
-      api as unknown as BlinkApi,
-      log,
-      dir,
-      vi.fn(),
-      factory
-    );
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      receiverFactory: (() => failing.receiver) as unknown as ReceiverFactory,
+      http,
+    });
     await listener.start();
     expect(log.warn).toHaveBeenCalled();
-    expect(api.updateClientNotificationKey).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(api.updateClientNotificationKey).toHaveBeenCalledTimes(1);
+    expect(calls.filter(c => c.url.endsWith('/update'))).toHaveLength(1);
     listener.stop();
   });
 });

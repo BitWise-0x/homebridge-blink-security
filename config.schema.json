@@ -168,7 +168,16 @@
         "title": "Push Notifications (doorbell presses)",
         "type": "boolean",
         "default": false,
-        "description": "Receive Blink's push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Registers this plugin as a notification client on your Blink account. Unofficial: Blink may change this protocol."
+        "description": "Receive Blink's push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Needs a one-time sign-in: the plugin log shows a Blink link to open, then paste the address Blink redirects to into the field below. Unofficial: Blink may change this protocol."
+      },
+      "push-sign-in-callback": {
+        "title": "Push sign-in callback",
+        "type": "string",
+        "placeholder": "https://applinks.blink.com/signin/callback?code=...",
+        "description": "Only for the one-time push sign-in: the full address Blink redirected to after signing in through the link in the plugin log. Can be cleared once the log says signed in.",
+        "condition": {
+          "functionBody": "return model['enable-push-notifications'] === true;"
+        }
       }
     },
     "required": ["username", "password"]
@@ -214,6 +223,7 @@
         "camera-motion-polling-seconds",
         "local-storage-motion",
         "enable-push-notifications",
+        "push-sign-in-callback",
         "audio-filter",
         "stream-address",
         "logging",
