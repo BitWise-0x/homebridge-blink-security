@@ -29,6 +29,8 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'audio-filter'?: string;
   'stream-address'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
+  'enable-push-notifications'?: boolean;
+  'push-sign-in-callback'?: string;
 }
 
 export type LocalStorageMotionMode = 'auto' | 'always' | 'never';
@@ -61,6 +63,8 @@ export interface BlinkOptions {
   streamAddress: string;
   hideRoutineLogs: boolean;
   localStorageMotion: LocalStorageMotionMode;
+  pushNotifications: boolean;
+  pushSignInCallback?: string;
 }
 
 export const DEFAULT_OPTIONS: BlinkOptions = {
@@ -92,6 +96,9 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   streamAddress: '',
   hideRoutineLogs: false,
   localStorageMotion: 'auto',
+  // Off by default: it registers an extra notification client on the Blink
+  // account, which the user should opt into.
+  pushNotifications: false,
 };
 
 export function normalizeConfig(
@@ -150,6 +157,7 @@ export function normalizeConfig(
   checkNumber('camera-motion-polling-seconds', 'motionPollingSeconds');
   checkBoolean('enable-startup-diagnostic', 'startupDiagnostic');
   checkBoolean('enable-audio', 'enableAudio');
+  checkBoolean('enable-push-notifications', 'pushNotifications');
 
   const audioFilter =
     typeof config['audio-filter'] === 'string'
@@ -180,6 +188,14 @@ export function normalizeConfig(
   opts.hideRoutineLogs = config.logging === 'quiet';
   opts.verbose = ['verbose', 'debug'].includes(config.logging ?? '');
   opts.debug = config.logging === 'debug';
+
+  const pushCallback =
+    typeof config['push-sign-in-callback'] === 'string'
+      ? config['push-sign-in-callback'].trim()
+      : '';
+  if (pushCallback) {
+    opts.pushSignInCallback = pushCallback;
+  }
 
   const lsMotion = config['local-storage-motion'];
   if (lsMotion && ['auto', 'always', 'never'].includes(lsMotion)) {

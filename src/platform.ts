@@ -119,6 +119,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
     }
+    this.blink?.stopPushNotifications();
     // Streams outlive the process otherwise: ffmpeg children are detached and
     // proxy servers keep holding their ports.
     for (const accessory of [
@@ -196,6 +197,16 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       this.lastDeviceFingerprint = this.deviceFingerprint();
       this.syncAccessories();
       this.schedulePoll();
+
+      if (this.config.pushNotifications) {
+        // Not awaited past its first attempt: it retries on its own and must
+        // not hold up polling.
+        void this.blink
+          .startPushNotifications(this.config.storagePath, {
+            signInCallback: this.config.pushSignInCallback,
+          })
+          .catch(err => this.log.warn(`Blink push notifications: ${err}`));
+      }
     } catch (err) {
       this.log.error(String(err));
       if (err instanceof BlinkAuth2FARequiredError) {

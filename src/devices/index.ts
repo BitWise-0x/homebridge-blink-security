@@ -26,6 +26,12 @@ import {
   type LocalStoragePollState,
 } from './localStorage.js';
 import { ExponentialBackoff } from '../lib/utils.js';
+import {
+  BlinkPushListener,
+  isDoorbellPress,
+  type BlinkPushEvent,
+  type PushListenerOptions,
+} from '../lib/push.js';
 
 export { BlinkDevice } from './base.js';
 export { BlinkNetwork } from './network.js';
@@ -134,6 +140,82 @@ export class Blink {
       options.blinkStatusPollingSeconds || MOTION_POLL
     );
     this.snapshotRate = snapshotRate ?? THUMBNAIL_TTL;
+  }
+
+  private pushListener?: BlinkPushListener;
+
+  /**
+   * Listen for Blink push notifications so doorbell presses are seen without
+   * a subscription (the cloud media list stays empty then) and without
+   * waiting for a clip to upload.
+   */
+  async startPushNotifications(
+    storagePath: string,
+    options: PushListenerOptions = {}
+  ): Promise<void> {
+    if (this.pushListener) {
+      return;
+    }
+    this.pushListener = new BlinkPushListener(
+      this.log,
+      storagePath,
+      event => this.handlePushEvent(event),
+      options
+    );
+    await this.pushListener.start();
+  }
+
+  stopPushNotifications(): void {
+    this.pushListener?.stop();
+    this.pushListener = undefined;
+  }
+
+  /** Route a push to the device it is about. */
+  handlePushEvent(event: BlinkPushEvent): void {
+    if (!isDoorbellPress(event)) {
+      return;
+    }
+    const doorbell = this.findPushDoorbell(event);
+    if (!doorbell) {
+      this.log.warn(
+        `Blink push: doorbell press for an unknown doorbell ` +
+          `(camera_id=${event.cameraId}, camera_name=${event.cameraName})`
+      );
+      return;
+    }
+    const eventTime = event.createdAt ? Date.parse(event.createdAt) : NaN;
+    const fired = doorbell.notifyPress(
+      Number.isFinite(eventTime) ? eventTime : Date.now()
+    );
+    if (fired) {
+      this.log.info(`${doorbell.name} - Doorbell pressed (push)`);
+    }
+  }
+
+  private findPushDoorbell(event: BlinkPushEvent): BlinkDoorbell | undefined {
+    if (event.cameraId !== undefined) {
+      const byId = this.doorbells.get(event.cameraId);
+      if (byId) {
+        return byId;
+      }
+    }
+    if (event.cameraName) {
+      const name = event.cameraName.toLowerCase();
+      const byName = [...this.doorbells.values()].filter(
+        d =>
+          String(d.data?.name ?? '').toLowerCase() === name &&
+          (event.networkId === undefined || d.networkID === event.networkId)
+      );
+      if (byName.length === 1) {
+        return byName[0];
+      }
+    }
+    // A press can only come from a doorbell: with one on the account there
+    // is nothing to disambiguate.
+    if (event.cameraId === undefined && this.doorbells.size === 1) {
+      return [...this.doorbells.values()][0];
+    }
+    return undefined;
   }
 
   protected createNetwork(data: NetworkData): BlinkNetwork {
