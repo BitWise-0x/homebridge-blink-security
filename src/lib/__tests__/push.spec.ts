@@ -74,6 +74,52 @@ describe('flattenPushData', () => {
 });
 
 describe('parseBlinkPush', () => {
+  it('parses a real Blink Video Doorbell press (ids changed)', () => {
+    // As received on 2026-10-31 from a Video Doorbell on an account without
+    // a subscription.
+    const event = parseBlinkPush({
+      message: {
+        data: {
+          message: 'Someone is at your Front Door',
+          thumbnail_url: '',
+          tier: 'e011',
+          target_name: 'Front Door',
+          vibrate: '1',
+          camera: '92001',
+          camera_name: 'Front Door',
+          ring_device_id: '700000001',
+          ring_event_id: '7700000000000000001',
+          event_type: 'button_press',
+          collapse_key: 'device#700000001#real_time#1793474949352',
+          sound: '1',
+          'pinpoint.campaign.campaign_id': '_DIRECT',
+          unique_id: 'AbCdEfGhIjKlMnOp',
+          target: 'doorbell',
+          created_at: '2026-10-31T19:29:09+00:00',
+          command: '0',
+          category: 'media',
+          return_receipt: 'true',
+          network: '110001',
+          video: '0',
+          account_id: '100001',
+          target_id: '92001',
+        },
+      },
+      persistentId: '0:1',
+    } as never);
+    expect(event).toMatchObject({
+      category: 'media',
+      eventType: 'button_press',
+      cameraId: 92001,
+      networkId: 110001,
+      cameraName: 'Front Door',
+      createdAt: '2026-10-31T19:29:09+00:00',
+      uniqueId: 'AbCdEfGhIjKlMnOp',
+      returnReceipt: true,
+    });
+    expect(isDoorbellPress(event)).toBe(true);
+  });
+
   it('parses a doorbell press with string ids and a receipt request', () => {
     const event = parseBlinkPush(
       envelope({
