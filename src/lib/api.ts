@@ -11,6 +11,10 @@ import { ExponentialBackoff, sleep } from './utils.js';
 // that no longer exists.
 const NOT_A_DOORBELL_STATUSES = [400, 404];
 
+// App version reported when registering for push notifications; the value
+// the Blink Android app sends, which Blink accepts for client updates.
+const PUSH_APP_VERSION = '60.0 (29834864)';
+
 export class BlinkApi {
   readonly client: BlinkClient;
   private readonly log: Logger;
@@ -382,6 +386,48 @@ export class BlinkApi {
       `/api/v1/accounts/{accountID}/networks/${networkID}/sync_modules/${syncModuleID}/local_storage/manifest/request/${manifestRequestID}`,
       0
     );
+  }
+
+  // --- Push notifications ---
+
+  /**
+   * Blink's id for this session's client. It is only exposed as the
+   * Client-Id header of an authenticated response; the OAuth login itself
+   * does not return it.
+   */
+  async getClientId(): Promise<string | undefined> {
+    const res = await this.client.rawRequest(
+      'GET',
+      '/api/v3/accounts/{accountID}/homescreen'
+    );
+    return res.headers['client-id'] || undefined;
+  }
+
+  /** Ask Blink to deliver this account's notifications to `token`. */
+  async updateClientNotificationKey(
+    clientId: string,
+    token: string,
+    clientName: string
+  ): Promise<void> {
+    await this.client.rawRequest(
+      'POST',
+      `/clients/${encodeURIComponent(clientId)}/update`,
+      {
+        app_version: PUSH_APP_VERSION,
+        os_version: '14',
+        client_name: clientName,
+        notification_key: token,
+      },
+      { 'Client-Id': clientId }
+    );
+  }
+
+  /** Acknowledge a push that asked for a delivery receipt. */
+  async sendNotificationReceipt(transactionId: string): Promise<void> {
+    await this.client.rawRequest('POST', '/api/v2/notification', {
+      transaction_id: transactionId,
+      status: 'RECEIVED',
+    });
   }
 
   // --- Media ---

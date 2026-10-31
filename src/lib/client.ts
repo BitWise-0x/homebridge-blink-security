@@ -307,6 +307,52 @@ export class BlinkClient {
     return res.data as T;
   }
 
+  /**
+   * One uncached request that also returns the response headers, for the few
+   * calls whose answer is in a header (the session's Client-Id) or that need
+   * extra request headers. Refreshes the token once on 401 like _request, but
+   * does not retry otherwise: callers of this are not on the polling path.
+   */
+  async rawRequest<T = unknown>(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+    retried = false
+  ): Promise<{ data: T; headers: Record<string, string> }> {
+    const resolvedPath = this.resolvePath(path);
+    const url = resolvedPath.startsWith('http')
+      ? resolvedPath
+      : `${this.baseURL}${resolvedPath}`;
+    this.log.debug(`${method} ${resolvedPath} (raw)`);
+    const res = await this.client.request({
+      method,
+      url,
+      data: body,
+      headers: body
+        ? { 'Content-Type': 'application/json', ...headers }
+        : headers,
+      validateStatus: () => true,
+    });
+    if (res.status === 401 && !retried) {
+      await this.authClient.refreshTokens();
+      return this.rawRequest<T>(method, path, body, headers, true);
+    }
+    if (res.status >= 400) {
+      throw new BlinkHttpError(
+        `${method} ${resolvedPath} (${res.status})`,
+        res.status
+      );
+    }
+    const flat: Record<string, string> = {};
+    for (const [key, value] of Object.entries(res.headers ?? {})) {
+      if (value !== undefined && value !== null) {
+        flat[key.toLowerCase()] = String(value);
+      }
+    }
+    return { data: res.data as T, headers: flat };
+  }
+
   async getUrl<T = unknown>(url: string): Promise<T> {
     return this.get<T>(url);
   }

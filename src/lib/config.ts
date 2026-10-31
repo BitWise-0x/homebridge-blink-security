@@ -29,6 +29,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   'audio-filter'?: string;
   'stream-address'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
+  'enable-push-notifications'?: boolean;
 }
 
 export type LocalStorageMotionMode = 'auto' | 'always' | 'never';
@@ -61,6 +62,7 @@ export interface BlinkOptions {
   streamAddress: string;
   hideRoutineLogs: boolean;
   localStorageMotion: LocalStorageMotionMode;
+  pushNotifications: boolean;
 }
 
 export const DEFAULT_OPTIONS: BlinkOptions = {
@@ -92,6 +94,9 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   streamAddress: '',
   hideRoutineLogs: false,
   localStorageMotion: 'auto',
+  // Off by default: it registers an extra notification client on the Blink
+  // account, which the user should opt into.
+  pushNotifications: false,
 };
 
 export function normalizeConfig(
@@ -150,6 +155,7 @@ export function normalizeConfig(
   checkNumber('camera-motion-polling-seconds', 'motionPollingSeconds');
   checkBoolean('enable-startup-diagnostic', 'startupDiagnostic');
   checkBoolean('enable-audio', 'enableAudio');
+  checkBoolean('enable-push-notifications', 'pushNotifications');
 
   const audioFilter =
     typeof config['audio-filter'] === 'string'

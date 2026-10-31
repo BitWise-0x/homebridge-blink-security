@@ -163,6 +163,12 @@
           { "title": "Always", "enum": ["always"] },
           { "title": "Never", "enum": ["never"] }
         ]
+      },
+      "enable-push-notifications": {
+        "title": "Push Notifications (doorbell presses)",
+        "type": "boolean",
+        "default": false,
+        "description": "Receive Blink's push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Registers this plugin as a notification client on your Blink account. Unofficial: Blink may change this protocol."
       }
     },
     "required": ["username", "password"]
@@ -207,6 +213,7 @@
         "camera-status-polling-seconds",
         "camera-motion-polling-seconds",
         "local-storage-motion",
+        "enable-push-notifications",
         "audio-filter",
         "stream-address",
         "logging",
