@@ -141,6 +141,12 @@
         "description": "Enable one-way audio in HomeKit Live View. Requires Audio Streaming to also be enabled in the Blink app under Device Settings → Privacy.",
         "type": "boolean"
       },
+      "liveview-transcode": {
+        "title": "Re-encode Live View video",
+        "default": false,
+        "description": "Re-encode the camera video with frequent keyframes at the resolution and bitrate HomeKit requests. Fixes Live View stalling (spinner) and ignored quality changes, at the cost of CPU on the Homebridge host.",
+        "type": "boolean"
+      },
       "audio-filter": {
         "title": "Audio Filter (advanced)",
         "type": "string",
@@ -193,6 +199,7 @@
         "hide-temperature-sensor",
         "enable-liveview",
         "enable-audio",
+        "liveview-transcode",
         "lv-save"
       ]
     },

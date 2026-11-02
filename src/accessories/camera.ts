@@ -163,7 +163,8 @@ export class CameraAccessory {
       this.config.enableAudio,
       this.config.hideRoutineLogs,
       this.config.audioFilter,
-      this.config.streamAddress
+      this.config.streamAddress,
+      this.config.transcodeLiveView
     );
 
     const controllerOptions: CameraControllerOptions = {

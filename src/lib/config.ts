@@ -26,6 +26,7 @@ export interface BlinkSecurityConfig extends PlatformConfig {
   logging?: 'quiet' | 'verbose' | 'debug';
   'enable-startup-diagnostic'?: boolean;
   'enable-audio'?: boolean;
+  'liveview-transcode'?: boolean;
   'audio-filter'?: string;
   'stream-address'?: string;
   'local-storage-motion'?: 'auto' | 'always' | 'never';
@@ -57,6 +58,7 @@ export interface BlinkOptions {
   debug: boolean;
   startupDiagnostic: boolean;
   enableAudio: boolean;
+  transcodeLiveView: boolean;
   audioFilter: string;
   streamAddress: string;
   hideRoutineLogs: boolean;
@@ -88,6 +90,7 @@ export const DEFAULT_OPTIONS: BlinkOptions = {
   debug: false,
   startupDiagnostic: false,
   enableAudio: false,
+  transcodeLiveView: false,
   audioFilter: '',
   streamAddress: '',
   hideRoutineLogs: false,
@@ -150,6 +153,7 @@ export function normalizeConfig(
   checkNumber('camera-motion-polling-seconds', 'motionPollingSeconds');
   checkBoolean('enable-startup-diagnostic', 'startupDiagnostic');
   checkBoolean('enable-audio', 'enableAudio');
+  checkBoolean('liveview-transcode', 'transcodeLiveView');
 
   const audioFilter =
     typeof config['audio-filter'] === 'string'
