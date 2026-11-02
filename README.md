@@ -112,13 +112,13 @@ graph TD
 - **Live view**: IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras)
 - **Security system**: Arm/disarm per network, with optional manual arm switch and opt-in alarm triggering on motion (`enable-alarm-triggering`)
 - **Multi-network**: Supports multiple sync modules, each with independent arm/disarm
-- **Motion detection**: Motion events surfaced to HomeKit by polling the Blink cloud (configurable interval, with debounce). Blink has no public push API, so detection trails the Blink app's own notification by roughly the clip upload time plus one poll cycle
+- **Motion detection**: Motion events surfaced to HomeKit by polling the Blink cloud (configurable interval, with debounce). Detection trails the Blink app's own notification by roughly the clip upload time plus one poll cycle
 - **Local storage motion**: Motion notifications without a Blink subscription. Accounts with no cloud storage use clips saved to the Sync Module's USB drive instead (`local-storage-motion`)
 - **Motion enable/disable**: Per-camera switch to turn motion detection on or off
 - **Snapshots**: Thumbnail refresh while the Home app is requesting snapshots, at most once per `camera-thumbnail-refresh-seconds` for each camera with motion detection enabled (armed or disarmed), with caching and retry
 - **Battery**: Battery level and low-battery alerts (Outdoor/Indoor models)
 - **Temperature**: Ambient temperature sensor (Outdoor/Indoor models)
-- **Doorbell press**: Doorbell button presses raised as HomeKit doorbell events. HomeKit delivers the push notification; detection is via cloud polling, like motion
+- **Doorbell press**: Doorbell button presses raised as HomeKit doorbell events. HomeKit delivers the push notification. Detection is via cloud polling, like motion, or within a second or two from Blink's push notifications with `enable-push-notifications`
 - **Privacy mode**: Per-camera switch that hides the camera's thumbnail in the Home app
 - **Night vision**: IR illuminator toggle (Outdoor/Indoor models)
 - **Clip recording**: Trigger a clip recording via momentary switch
@@ -207,6 +207,8 @@ Blink requires two-factor authentication on first login:
 | `camera-status-polling-seconds`    | integer | `20`       | Camera status polling interval in seconds. Effective cadence rounds up to the next `blink-status-polling-seconds` tick                                                                                                                                                                                                                                                                                                      |
 | `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds. Effectively capped at `blink-status-polling-seconds`; a longer value would only add notification latency without reducing API load                                                                                                                                                                                                                                            |
 | `local-storage-motion`             | string  | `"auto"`   | Detect motion from Sync Module local (USB) storage clips on accounts without cloud clip storage. `"auto"` engages only while no cloud clips exist; `"always"` / `"never"` force it on or off. Local clips are checked every ~20s, clips already on the drive at startup are never replayed as motion, and doorbell button presses are reported as motion on this path (Blink's local manifest does not distinguish presses) |
+| `enable-push-notifications`        | boolean | `false`    | Receive Blink push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Registers this plugin as a notification client on the Blink account (see [Doorbell presses without a Blink subscription](#doorbell-presses-without-a-blink-subscription))                                                                                                                 |
+| `push-sign-in-callback`            | string  |            | Only for the one-time push sign-in: the address Blink redirects to after signing in through the link in the log                                                                                                                                                                                                                                                                                                             |
 | `logging`                          | string  |            | `"quiet"` suppresses routine chatter (thumbnail refresh, reconfigure, clip recording, sleep). `"verbose"` or `"debug"` for extended logging                                                                                                                                                                                                                                                                                 |
 | `enable-startup-diagnostic`        | boolean | `false`    | Log diagnostic info on startup                                                                                                                                                                                                                                                                                                                                                                                              |
 
@@ -309,11 +311,24 @@ These settings reset whenever HomeKit sees an accessory as new: re-pairing the b
 
 ### HomeKit notifications arrive later than the Blink app
 
-The Blink app is notified by Blink's private push service the moment a camera starts recording. There is no public push API, so the plugin can only discover an event by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided.
+The Blink app is notified by Blink's push service the moment a camera starts recording. The plugin discovers motion by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided. Doorbell presses avoid the delay with `enable-push-notifications` (see [Doorbell presses without a Blink subscription](#doorbell-presses-without-a-blink-subscription)).
 
 ### No motion notifications without a Blink subscription
 
 Accounts without a cloud storage plan have an empty cloud media list, so cloud polling finds nothing to report. Put a USB drive in the Sync Module and enable Local Storage in the Blink app; the plugin then detects motion from the sync module's local storage manifest instead. The startup log shows what the plugin sees, e.g. `Local storage: compatible=true, enabled=true, status=active`. The `local-storage-motion` option controls the fallback; the default `auto` engages it only while the cloud media list is empty.
+
+### Doorbell presses without a Blink subscription
+
+Polling finds doorbell presses in the cloud clip list, which stays empty without a Blink subscription, so the doorbell never rings in HomeKit. Set `enable-push-notifications: true` to receive presses from Blink's push notifications instead, the channel the Blink app itself uses. Presses then arrive within a second or two, with or without a subscription, and HomePods play the doorbell chime.
+
+Blink only sends these pushes to clients of its Android app, so push notifications use a second Blink session, signed in once through Blink's own sign-in page:
+
+1. Enable the option and restart. The log shows a warning with a Blink sign-in link.
+2. Open the link in a browser on a computer and sign in to Blink (with your usual 2FA code). On a phone with the Blink app installed, the app takes over the redirect and the address cannot be copied.
+3. Blink then redirects to an address starting with `https://applinks.blink.com/signin/callback?code=…`. The page itself may not load; copy the full address from the address bar.
+4. Paste it into **Push sign-in callback** (`push-sign-in-callback`) and restart. The log shows `Blink push: signed in` and then `Blink push notifications connected`. The field can be cleared afterwards.
+
+The plugin never sees your password for this session. It registers a Firebase Cloud Messaging token for the Blink app's public Firebase project and asks Blink to deliver that session's notifications to it; your phone keeps its own notifications. The protocol is unofficial (worked out by [ha-blink-live-events](https://github.com/CoreyHayward/ha-blink-live-events) and [ha-blink-instant-events](https://github.com/rohanjariwala03/ha-blink-instant-events)), so a Blink app update can break it; polling keeps working either way. Turning the option off signs the push session out of the Blink account at the next restart; if Blink refuses the sign-out, the log says so.
 
 ### Motion notifications point at the Security System instead of the camera
 

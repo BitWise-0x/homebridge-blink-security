@@ -69,6 +69,25 @@ export class BlinkDoorbell extends BlinkCamera {
     return false;
   }
 
+  /**
+   * A press reported by a Blink push notification. Every push is a new press:
+   * the push channel itself filters redeliveries. `eventTime` comes from
+   * Blink's clock, so it is only used to screen out stale pushes (one held
+   * back while the listener was offline).
+   */
+  notifyPress(eventTime = Date.now()): boolean {
+    if (Date.now() - eventTime >= MOTION_TRIGGER_DECAY * 1000) {
+      return false;
+    }
+    // Polling may later list the same press as a cloud clip, stamped by
+    // Blink when the press happened. Stamping with the later of arrival time
+    // and Blink's time makes checkForPress treat that clip as reported, even
+    // if this host's clock runs behind Blink's.
+    this.lastDoorbellPress = Math.max(Date.now(), eventTime);
+    this._onPress?.(this);
+    return true;
+  }
+
   override async setEnabled(target = true): Promise<void> {
     if (this.enabled !== Boolean(target)) {
       await this.blink.setDoorbellMotionSensorState(
