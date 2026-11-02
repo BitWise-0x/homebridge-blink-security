@@ -16,6 +16,12 @@ import {
   type PushSessionData,
   type PushSignInPending,
 } from './pushAuth.js';
+import {
+  BLINK_FIREBASE_CONFIG,
+  PUSH_APP_VERSION,
+  PUSH_OS_VERSION,
+} from './request.js';
+import { ExponentialBackoff } from './utils.js';
 
 /**
  * Blink push notifications, the channel the Blink app itself is told about
@@ -30,18 +36,7 @@ import {
  * worked out by ha-blink-live-events and ha-blink-instant-events.
  */
 
-// Public Firebase client identifiers of the Blink Android app (not secrets).
-export const BLINK_FIREBASE_CONFIG = {
-  projectId: 'blink-6c1ea',
-  appId: '1:351117235468:android:14fb3ef63df2a7c2',
-  apiKey: 'AIzaSyBcgwrpglzCZJPUNNeQQnpBbJAFlas_XAI',
-  messagingSenderId: '351117235468',
-};
-
 export const PUSH_CLIENT_NAME = 'Homebridge Blink Security';
-// App version reported when registering for push notifications: the value
-// the Blink Android app sends, which Blink accepts for client updates.
-const PUSH_APP_VERSION = '60.0 (29834864)';
 
 // Persistent ids are how the push server knows which messages were already
 // delivered; only the recent ones matter.
@@ -191,11 +186,60 @@ export function isDoorbellPress(event: BlinkPushEvent): boolean {
   );
 }
 
+function pushStateFile(storagePath: string): string {
+  return path.join(storagePath, 'blink', 'push.json');
+}
+
+/**
+ * Sign out a push session left from when push notifications were on, so it
+ * does not linger on the Blink account as a signed-in client. The session is
+ * forgotten either way: a sign-out Blink refuses would be refused again.
+ */
+export async function signOutPushSession(
+  log: Logger,
+  storagePath: string,
+  http: PushHttp = defaultPushHttp
+): Promise<void> {
+  const file = pushStateFile(storagePath);
+  if (!fs.existsSync(file)) {
+    return;
+  }
+  let session: PushSessionData | undefined;
+  try {
+    session = (JSON.parse(fs.readFileSync(file, 'utf8')) as PersistedPushState)
+      .session;
+  } catch (err) {
+    log.warn(`Blink push: unreadable ${file}, removing it: ${err}`);
+  }
+  if (session) {
+    const auth = new PushAuth(session, http, () => undefined);
+    try {
+      await auth.request(
+        'POST',
+        `/api/v4/account/${session.accountId}/client/${encodeURIComponent(
+          session.clientId
+        )}/logout`
+      );
+      log.info('Blink push: signed out');
+    } catch (err) {
+      if (!(err instanceof PushSignInRequiredError)) {
+        log.warn(
+          `Blink push: sign-out failed (${
+            err instanceof Error ? err.message : String(err)
+          }). Remove the "${PUSH_CLIENT_NAME}" client from the Blink account ` +
+            'if it is still listed.'
+        );
+      }
+    }
+  }
+  fs.rmSync(file, { force: true });
+}
+
 export class BlinkPushListener {
   private receiver?: ReceiverLike;
   private state: PersistedPushState = {};
   private readonly stateFile: string;
-  private retryMs = RETRY_MIN_MS;
+  private readonly backoff = new ExponentialBackoff(RETRY_MIN_MS, RETRY_MAX_MS);
   private retryTimer?: ReturnType<typeof setTimeout>;
   private stopped = false;
   private associatedToken?: string;
@@ -209,7 +253,7 @@ export class BlinkPushListener {
     private readonly onEvent: (event: BlinkPushEvent) => void,
     private readonly options: PushListenerOptions = {}
   ) {
-    this.stateFile = path.join(storagePath, 'blink', 'push.json');
+    this.stateFile = pushStateFile(storagePath);
     this.receiverFactory = options.receiverFactory ?? defaultReceiverFactory;
     this.http = options.http ?? defaultPushHttp;
   }
@@ -227,15 +271,18 @@ export class BlinkPushListener {
     }
     try {
       await this.connect();
-      this.retryMs = RETRY_MIN_MS;
+      this.backoff.reset();
     } catch (err) {
+      if (this.stopped) {
+        return;
+      }
       if (err instanceof PushSignInRequiredError) {
         this.requireSignIn(err.message);
         return;
       }
       this.log.warn(
         `Blink push notifications unavailable, retrying in ${Math.round(
-          this.retryMs / 1000
+          this.backoff.delayMs / 1000
         )}s: ${err instanceof Error ? err.message : String(err)}`
       );
       this.scheduleRetry();
@@ -315,7 +362,8 @@ export class BlinkPushListener {
     this.saveState();
     this.log.warn(
       `Blink push notifications need a one-time sign-in${reason ? ` (${reason})` : ''}. ` +
-        'Open this link in a browser and sign in to Blink:\n' +
+        'Open this link in a browser on a computer (on a phone the Blink app ' +
+        'takes over the redirect) and sign in to Blink:\n' +
         `${signInUrl(this.state.pending)}\n` +
         'Blink then opens an address starting with ' +
         'https://applinks.blink.com/signin/callback (the page itself may not load). ' +
@@ -333,8 +381,8 @@ export class BlinkPushListener {
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
       void this.start();
-    }, this.retryMs);
-    this.retryMs = Math.min(this.retryMs * 2, RETRY_MAX_MS);
+    }, this.backoff.delayMs);
+    this.backoff.increment();
   }
 
   private async connect(): Promise<void> {
@@ -358,6 +406,11 @@ export class BlinkPushListener {
     receiver.onNotification(envelope => this.handle(envelope));
 
     await receiver.connect();
+    // stop() during the connect already destroyed the receiver; registering
+    // the token now would point Blink at a listener that is gone.
+    if (this.stopped) {
+      return;
+    }
     await this.associate();
     this.log.info('Blink push notifications connected');
   }
@@ -385,7 +438,7 @@ export class BlinkPushListener {
       `/clients/${encodeURIComponent(clientId)}/update`,
       {
         app_version: PUSH_APP_VERSION,
-        os_version: '14',
+        os_version: PUSH_OS_VERSION,
         client_name: PUSH_CLIENT_NAME,
         notification_key: token,
       }
@@ -452,7 +505,7 @@ export class BlinkPushListener {
       fs.writeFileSync(tmp, JSON.stringify(this.state), { mode: 0o600 });
       fs.renameSync(tmp, this.stateFile);
     } catch (err) {
-      this.log.debug(`Blink push: could not save state: ${err}`);
+      this.log.warn(`Blink push: could not save state: ${err}`);
     }
   }
 }

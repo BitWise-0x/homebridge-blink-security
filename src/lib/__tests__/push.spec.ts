@@ -10,6 +10,7 @@ import {
   flattenPushData,
   isDoorbellPress,
   parseBlinkPush,
+  signOutPushSession,
   type ReceiverFactory,
 } from '../push.js';
 import {
@@ -568,5 +569,94 @@ describe('BlinkPushListener', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(calls.filter(c => c.url.endsWith('/update'))).toHaveLength(1);
     listener.stop();
+  });
+
+  it('does not register the token when stopped while connecting', async () => {
+    writeState({ session, credentials: { fcm: { token: 'fcm-token' } } });
+    const { receiver } = fakeReceiver();
+    let finishConnect = () => {};
+    receiver.connect.mockReturnValueOnce(
+      new Promise<void>(resolve => (finishConnect = resolve))
+    );
+    const { http, calls } = fakeHttp();
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http,
+    });
+    const started = listener.start();
+    await vi.waitFor(() => expect(receiver.connect).toHaveBeenCalled());
+    listener.stop();
+    finishConnect();
+    await started;
+    expect(receiver.destroy).toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+    expect(log.info).not.toHaveBeenCalledWith(
+      'Blink push notifications connected'
+    );
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('signOutPushSession', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'blink-push-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const stateFile = () => path.join(dir, 'blink', 'push.json');
+
+  function writeSession() {
+    fs.mkdirSync(path.join(dir, 'blink'), { recursive: true });
+    fs.writeFileSync(
+      stateFile(),
+      JSON.stringify({
+        session: {
+          hardwareId: 'HW',
+          accessToken: 'access',
+          refreshToken: 'refresh',
+          expiresAt: Date.now() + 3_600_000,
+          tier: 'e006',
+          accountId: 1234,
+          clientId: '987',
+        },
+      })
+    );
+  }
+
+  it('does nothing when push notifications were never set up', async () => {
+    const http = vi.fn();
+    await signOutPushSession(makeLog(), dir, http as unknown as PushHttp);
+    expect(http).not.toHaveBeenCalled();
+  });
+
+  it('signs the push client out and forgets the session', async () => {
+    writeSession();
+    const http = vi.fn(async () => ({ status: 200, data: {}, headers: {} }));
+    await signOutPushSession(makeLog(), dir, http as unknown as PushHttp);
+    expect(http).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        url: 'https://rest-e006.immedia-semi.com/api/v4/account/1234/client/987/logout',
+        headers: { Authorization: 'Bearer access', 'Client-Id': '987' },
+      })
+    );
+    expect(fs.existsSync(stateFile())).toBe(false);
+  });
+
+  it('forgets the session and says so when the sign-out fails', async () => {
+    writeSession();
+    const http = vi.fn(async () => ({ status: 500, data: {}, headers: {} }));
+    const log = makeLog();
+    await signOutPushSession(log, dir, http as unknown as PushHttp);
+    expect(String(vi.mocked(log.warn).mock.calls[0][0])).toContain(
+      'sign-out failed'
+    );
+    expect(fs.existsSync(stateFile())).toBe(false);
   });
 });

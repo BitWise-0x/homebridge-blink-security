@@ -1,6 +1,23 @@
 import crypto from 'crypto';
 import axios from 'axios';
 
+import {
+  APP_BRAND,
+  BLINK_TIER_INFO_PATH,
+  OAUTH_AUTHORIZE_PATH,
+  OAUTH_BASE_URL,
+  OAUTH_CODE_CHALLENGE_METHOD,
+  OAUTH_RESPONSE_TYPE,
+  OAUTH_SCOPE,
+  OAUTH_TOKEN_PATH,
+  PUSH_OAUTH_CLIENT_ID,
+  PUSH_OS_VERSION,
+  PUSH_REDIRECT_URI,
+  PUSH_USER_AGENT,
+  TOKEN_EXPIRY_BUFFER_MS,
+  getRegionBaseURL,
+} from './request.js';
+
 /**
  * The Blink session push notifications are delivered to.
  *
@@ -12,16 +29,7 @@ import axios from 'axios';
  * so the plugin never sees a password or 2FA code for it.
  */
 
-export const PUSH_OAUTH_CLIENT_ID = 'android';
-export const PUSH_REDIRECT_URI = 'https://applinks.blink.com/signin/callback';
-const OAUTH_AUTHORIZE_URL = 'https://api.oauth.blink.com/oauth/v2/authorize';
-const OAUTH_TOKEN_URL = 'https://api.oauth.blink.com/oauth/token';
-const TIER_INFO_URL =
-  'https://rest-prod.immedia-semi.com/api/v1/users/tier_info';
-// Blink's Cloudflare turns away default HTTP client agents.
-const USER_AGENT = 'Blink/60.0 (Homebridge)';
-// Renew this long before the access token expires.
-const REFRESH_MARGIN_MS = 60_000;
+const OAUTH_TOKEN_URL = `${OAUTH_BASE_URL}${OAUTH_TOKEN_PATH}`;
 
 export interface PushSessionData {
   hardwareId: string;
@@ -74,7 +82,7 @@ export const defaultPushHttp: PushHttp = async ({
     method,
     url,
     headers: {
-      'User-Agent': USER_AGENT,
+      'User-Agent': PUSH_USER_AGENT,
       Accept: 'application/json',
       ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
       ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -118,21 +126,21 @@ export function signInUrl(pending: PushSignInPending): string {
   const params = new URLSearchParams({
     client_id: PUSH_OAUTH_CLIENT_ID,
     redirect_uri: PUSH_REDIRECT_URI,
-    response_type: 'code',
-    scope: 'client',
+    response_type: OAUTH_RESPONSE_TYPE,
+    scope: OAUTH_SCOPE,
     state: pending.state,
     code_challenge: challenge,
-    code_challenge_method: 'S256',
+    code_challenge_method: OAUTH_CODE_CHALLENGE_METHOD,
     prompt: 'login',
     hardware_id: pending.hardwareId,
-    app_brand: 'blink',
+    app_brand: APP_BRAND,
     app_version: 'Version 60.0',
     device_brand: 'Homebridge',
     device_model: 'Homebridge Blink Security',
-    device_os_version: 'Android 14',
+    device_os_version: `Android ${PUSH_OS_VERSION}`,
     dark_mode: 'false',
   });
-  return `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
+  return `${OAUTH_BASE_URL}${OAUTH_AUTHORIZE_PATH}?${params.toString()}`;
 }
 
 /**
@@ -202,8 +210,8 @@ export async function exchangeSignIn(
       code_verifier: pending.verifier,
       client_id: PUSH_OAUTH_CLIENT_ID,
       hardware_id: pending.hardwareId,
-      scope: 'client',
-      app_brand: 'blink',
+      scope: OAUTH_SCOPE,
+      app_brand: APP_BRAND,
     },
   });
   if (tokenRes.status !== 200) {
@@ -216,7 +224,7 @@ export async function exchangeSignIn(
 
   const tierRes = await http({
     method: 'GET',
-    url: TIER_INFO_URL,
+    url: `${getRegionBaseURL('prod')}${BLINK_TIER_INFO_PATH}`,
     headers: auth,
   });
   const tierInfo = (tierRes.data ?? {}) as Record<string, unknown>;
@@ -228,7 +236,7 @@ export async function exchangeSignIn(
 
   const homeRes = await http({
     method: 'GET',
-    url: `https://rest-${tier}.immedia-semi.com/api/v3/accounts/${accountId}/homescreen`,
+    url: `${getRegionBaseURL(tier)}/api/v3/accounts/${accountId}/homescreen`,
     headers: auth,
   });
   const clientId = homeRes.headers['client-id'];
@@ -273,7 +281,7 @@ export class PushAuth {
             grant_type: 'refresh_token',
             refresh_token: this.session.refreshToken,
             client_id: PUSH_OAUTH_CLIENT_ID,
-            scope: 'client',
+            scope: OAUTH_SCOPE,
             hardware_id: this.session.hardwareId,
           },
         });
@@ -303,12 +311,12 @@ export class PushAuth {
     json?: unknown,
     retried = false
   ): Promise<unknown> {
-    if (Date.now() > this.session.expiresAt - REFRESH_MARGIN_MS) {
+    if (Date.now() > this.session.expiresAt - TOKEN_EXPIRY_BUFFER_MS) {
       await this.renew();
     }
     const res = await this.http({
       method,
-      url: `https://rest-${this.session.tier}.immedia-semi.com${path}`,
+      url: `${getRegionBaseURL(this.session.tier)}${path}`,
       headers: {
         Authorization: `Bearer ${this.session.accessToken}`,
         'Client-Id': this.session.clientId,

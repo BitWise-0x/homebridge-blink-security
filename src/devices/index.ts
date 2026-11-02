@@ -29,6 +29,7 @@ import { ExponentialBackoff } from '../lib/utils.js';
 import {
   BlinkPushListener,
   isDoorbellPress,
+  signOutPushSession,
   type BlinkPushEvent,
   type PushListenerOptions,
 } from '../lib/push.js';
@@ -168,6 +169,12 @@ export class Blink {
   stopPushNotifications(): void {
     this.pushListener?.stop();
     this.pushListener = undefined;
+  }
+
+  /** Sign out the push session once push notifications are turned off. */
+  async endPushNotifications(storagePath: string): Promise<void> {
+    this.stopPushNotifications();
+    await signOutPushSession(this.log, storagePath);
   }
 
   /** Route a push to the device it is about. */
