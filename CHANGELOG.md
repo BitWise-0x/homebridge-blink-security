@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.10...v2.1.0-beta.1) (2026-11-02)
+
+### Features
+
+* **push:** doorbell presses from Blink push notifications ([#92](https://github.com/BitWise-0x/homebridge-blink-security/issues/92)) ([7644670](https://github.com/BitWise-0x/homebridge-blink-security/commit/7644670dc8dd02acedcf0e352388986809a5080b))
+
 ## [2.0.10](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.9...v2.0.10) (2026-10-30)
 
 ### Bug Fixes
