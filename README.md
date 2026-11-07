@@ -2,7 +2,7 @@
 
 <h1>
   <a href="https://github.com/BitWise-0x/homebridge-blink-security">
-    <img align="center" src="homebridge-ui/public/banner.svg" />
+    <img align="center" src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/banner.svg" />
   </a>
   <br />
   Homebridge Blink Security
@@ -25,9 +25,9 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 </span>
 <br><br>
 <p align="center">
-  <img src="homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home camera feeds and security status" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home camera feeds and security status" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
 </p>
 
 <br>
@@ -145,11 +145,11 @@ graph TD
 3. Configure your Blink credentials through the settings panel.
 
 <p align="center">
-  <img src="homebridge-ui/public/screenshot1.png" width="400" alt="Plugin settings screenshot" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot1.png" width="400" alt="Plugin settings screenshot" />
 </p>
 
 <p align="center">
-  <img src="homebridge-ui/public/screenshot3.png" alt="Homebridge logs" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot3.png" alt="Homebridge logs" />
 </p>
 
 ### Manual
