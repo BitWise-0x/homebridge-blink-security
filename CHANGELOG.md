@@ -20,6 +20,12 @@ All notable changes to this project will be documented in this file. See
 ### Features
 
 * **push:** doorbell presses from Blink push notifications ([#92](https://github.com/BitWise-0x/homebridge-blink-security/issues/92)) ([7644670](https://github.com/BitWise-0x/homebridge-blink-security/commit/7644670dc8dd02acedcf0e352388986809a5080b))
+## [2.0.11](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.10...v2.0.11) (2026-11-07)
+
+### Bug Fixes
+
+* **deps:** bump follow-redirects from 1.16.1 to 1.16.2 ([da096a5](https://github.com/BitWise-0x/homebridge-blink-security/commit/da096a5361aa73515f60c799d820104e5a909072))
+* **deps:** bump node-forge and homebridge-config-ui-x ([7a48079](https://github.com/BitWise-0x/homebridge-blink-security/commit/7a480790b76db773ec0ea250733933300e86cc30))
 
 ## [2.0.10](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.9...v2.0.10) (2026-10-30)
 
