@@ -458,6 +458,212 @@ describe('BlinkPushListener', () => {
     listener.stop();
   });
 
+  it('finishes the sign-in when the callback is saved to config.json, without a restart', async () => {
+    const configPath = path.join(dir, 'config.json');
+    const writeConfig = (callback?: string) =>
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({
+          platforms: [
+            { platform: 'config' },
+            { platform: 'BlinkSecurity', 'push-sign-in-callback': callback },
+          ],
+        })
+      );
+    writeConfig();
+    const { receiver } = fakeReceiver();
+    const http = vi.fn(async (req: { url: string }) => {
+      if (req.url.endsWith('/oauth/token')) {
+        return {
+          status: 200,
+          data: { access_token: 'a', refresh_token: 'r', expires_in: 3600 },
+          headers: {},
+        };
+      }
+      if (req.url.endsWith('/tier_info')) {
+        return {
+          status: 200,
+          data: { tier: 'e006', account_id: 1234 },
+          headers: {},
+        };
+      }
+      if (req.url.endsWith('/homescreen')) {
+        return { status: 200, data: {}, headers: { 'client-id': '555' } };
+      }
+      return { status: 200, data: {}, headers: {} };
+    });
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      configPath,
+      configPollMs: 20,
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http: http as unknown as PushHttp,
+    });
+    await listener.start();
+    expect(listener.signedIn).toBe(false);
+    const { state } = readState().pending;
+
+    // an address from some earlier link is left alone
+    writeConfig(
+      'https://applinks.blink.com/signin/callback?code=OLD&state=other'
+    );
+    await new Promise(r => setTimeout(r, 80));
+    expect(listener.signedIn).toBe(false);
+
+    writeConfig(
+      `https://applinks.blink.com/signin/callback?code=C0DE&passkey_nudge=true&state=${state}`
+    );
+    await vi.waitFor(() => expect(receiver.connect).toHaveBeenCalled(), {
+      timeout: 3000,
+    });
+    expect(listener.signedIn).toBe(true);
+    expect(http).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.oauth.blink.com/oauth/token',
+        form: expect.objectContaining({ code: 'C0DE' }),
+      })
+    );
+    expect(log.info).toHaveBeenCalledWith('Blink push: signed in');
+    expect(readState().pending).toBeUndefined();
+    listener.stop();
+  });
+
+  it('retires the link and prints a new one when the saved code is refused', async () => {
+    const configPath = path.join(dir, 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ platforms: [] }));
+    const http = vi.fn(async () => ({
+      status: 401,
+      data: { error: 'invalid_grant' },
+      headers: {},
+    }));
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      configPath,
+      configPollMs: 20,
+      receiverFactory: (() =>
+        fakeReceiver().receiver) as unknown as ReceiverFactory,
+      http: http as unknown as PushHttp,
+    });
+    await listener.start();
+    const first = readState().pending.state;
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        platforms: [
+          {
+            platform: 'BlinkSecurity',
+            'push-sign-in-callback': `https://applinks.blink.com/signin/callback?code=X&state=${first}`,
+          },
+        ],
+      })
+    );
+    await vi.waitFor(() => expect(readState().pending.state).not.toBe(first), {
+      timeout: 3000,
+    });
+    const warnings = vi.mocked(log.warn).mock.calls.map(c => String(c[0]));
+    expect(warnings.some(w => w.includes('expired or was already used'))).toBe(
+      true
+    );
+    expect(listener.signedIn).toBe(false);
+    listener.stop();
+  });
+
+  it('registers the token with the new client after signing in again', async () => {
+    writeState({ session });
+    const configPath = path.join(dir, 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ platforms: [] }));
+    const { receiver, handlers } = fakeReceiver();
+    let mode: 'ok' | 'ended' = 'ok';
+    const http = vi.fn(async (req: { url: string }) => {
+      if (mode === 'ended') {
+        return { status: 401, data: {}, headers: {} };
+      }
+      if (req.url.endsWith('/oauth/token')) {
+        return {
+          status: 200,
+          data: { access_token: 'a', refresh_token: 'r', expires_in: 3600 },
+          headers: {},
+        };
+      }
+      if (req.url.endsWith('/tier_info')) {
+        return {
+          status: 200,
+          data: { tier: 'e006', account_id: 1234 },
+          headers: {},
+        };
+      }
+      if (req.url.endsWith('/homescreen')) {
+        return { status: 200, data: {}, headers: { 'client-id': '555' } };
+      }
+      return { status: 200, data: {}, headers: {} };
+    });
+    const listener = new BlinkPushListener(makeLog(), dir, vi.fn(), {
+      configPath,
+      configPollMs: 20,
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http: http as unknown as PushHttp,
+    });
+    await listener.start();
+    expect(listener.signedIn).toBe(true);
+
+    // Blink ends the session while a rotated token is being registered.
+    mode = 'ended';
+    receiver.fcmToken = 'rotated';
+    handlers.creds?.({ newCredentials: { fcm: { token: 'rotated' } } });
+    await vi.waitFor(() => expect(listener.signedIn).toBe(false), {
+      timeout: 3000,
+    });
+
+    mode = 'ok';
+    receiver.fcmToken = 'fcm-token';
+    const { state } = readState().pending;
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        platforms: [
+          {
+            platform: 'BlinkSecurity',
+            'push-sign-in-callback': `https://applinks.blink.com/signin/callback?code=C0DE&state=${state}`,
+          },
+        ],
+      })
+    );
+    await vi.waitFor(
+      () =>
+        expect(http).toHaveBeenCalledWith(
+          expect.objectContaining({
+            url: 'https://rest-e006.immedia-semi.com/clients/555/update',
+          })
+        ),
+      { timeout: 3000 }
+    );
+    listener.stop();
+  });
+
+  it('repeats the sign-in link while the sign-in is still pending', async () => {
+    vi.useFakeTimers();
+    const configPath = path.join(dir, 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ platforms: [] }));
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      configPath,
+      receiverFactory: (() =>
+        fakeReceiver().receiver) as unknown as ReceiverFactory,
+      http: fakeHttp().http,
+    });
+    await listener.start();
+    const reminders = () =>
+      vi
+        .mocked(log.warn)
+        .mock.calls.filter(c => String(c[0]).includes('sign in once')).length;
+    expect(reminders()).toBe(1);
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(reminders()).toBe(1);
+    await vi.advanceTimersByTimeAsync(6 * 60_000);
+    expect(reminders()).toBe(2);
+    listener.stop();
+  });
+
   it('ignores a callback address from another sign-in attempt', async () => {
     writeState({ pending: newSignInPending() });
     const { http } = fakeHttp();
@@ -565,7 +771,7 @@ describe('BlinkPushListener', () => {
     await listener.start();
     expect(listener.signedIn).toBe(false);
     expect(String(vi.mocked(log.warn).mock.calls.at(-1)?.[0])).toContain(
-      'one-time sign-in'
+      'Blink push: sign in once'
     );
   });
 

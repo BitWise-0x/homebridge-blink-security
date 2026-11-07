@@ -215,9 +215,13 @@ export async function exchangeSignIn(
     },
   });
   if (tokenRes.status !== 200) {
-    throw new PushSignInRequiredError(
-      `Blink refused the sign-in (HTTP ${tokenRes.status}); the link may have expired`
-    );
+    // invalid_grant is what an expired or already used code comes back as.
+    const body = (tokenRes.data ?? {}) as Record<string, unknown>;
+    const reason =
+      body.error === 'invalid_grant'
+        ? 'the code expired or was already used'
+        : `HTTP ${tokenRes.status}${body.error ? ` ${body.error}` : ''}`;
+    throw new PushSignInRequiredError(`Blink refused the sign-in: ${reason}`);
   }
   const tokens = tokenFields(tokenRes.data);
   const auth = { Authorization: `Bearer ${tokens.accessToken}` };

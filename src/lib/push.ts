@@ -22,6 +22,7 @@ import {
   PUSH_OS_VERSION,
 } from './request.js';
 import { ExponentialBackoff } from './utils.js';
+import { PLATFORM_NAME } from '../settings.js';
 
 /**
  * Blink push notifications, the channel the Blink app itself is told about
@@ -43,6 +44,11 @@ export const PUSH_CLIENT_NAME = 'Homebridge Blink Security';
 const MAX_PERSISTENT_IDS = 100;
 const RETRY_MIN_MS = 60_000;
 const RETRY_MAX_MS = 30 * 60_000;
+// Polled rather than fs.watch: inotify does not reach a config.json on a
+// network or bind-mounted volume. Only runs while a sign-in is pending.
+const CONFIG_POLL_MS = 2000;
+// The sign-in link scrolls out of a busy log; repeat it while still needed.
+const SIGN_IN_REMINDER_MS = 15 * 60_000;
 
 const DOORBELL_EVENT_TYPES = ['button_press'];
 
@@ -69,6 +75,13 @@ interface PersistedPushState {
 export interface PushListenerOptions {
   /** The address Blink redirected to after the hosted sign-in. */
   signInCallback?: string;
+  /**
+   * Homebridge's config.json. While a sign-in is pending it is watched for
+   * the callback address, so the code is used as soon as the setting is
+   * saved: Blink's codes expire within minutes, well inside a restart.
+   */
+  configPath?: string;
+  configPollMs?: number;
   receiverFactory?: ReceiverFactory;
   http?: PushHttp;
 }
@@ -242,6 +255,9 @@ export class BlinkPushListener {
   private readonly backoff = new ExponentialBackoff(RETRY_MIN_MS, RETRY_MAX_MS);
   private retryTimer?: ReturnType<typeof setTimeout>;
   private stopped = false;
+  private configTimer?: ReturnType<typeof setInterval>;
+  private signInLoggedAt = 0;
+  private exchanging = false;
   private associatedToken?: string;
   private auth?: PushAuth;
   private readonly receiverFactory: ReceiverFactory;
@@ -269,6 +285,11 @@ export class BlinkPushListener {
     if (!(await this.ensureSession())) {
       return;
     }
+    await this.run();
+  }
+
+  /** Connect the signed-in session, retrying on anything but a lost session. */
+  private async run(): Promise<void> {
     try {
       await this.connect();
       this.backoff.reset();
@@ -291,6 +312,7 @@ export class BlinkPushListener {
 
   stop(): void {
     this.stopped = true;
+    this.unwatchConfig();
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = undefined;
@@ -320,22 +342,7 @@ export class BlinkPushListener {
               'answer the current sign-in link (it may be from an older attempt).'
           );
         } else {
-          try {
-            this.state.session = await exchangeSignIn(this.http, code, pending);
-            this.state.pending = undefined;
-            this.saveState();
-            this.log.info(
-              'Blink push: signed in. You can clear "push-sign-in-callback" now.'
-            );
-          } catch (err) {
-            this.log.warn(
-              `Blink push: sign-in could not be completed: ${
-                err instanceof Error ? err.message : String(err)
-              }`
-            );
-            // The code is single use: start over with a fresh link.
-            this.state.pending = undefined;
-          }
+          await this.finishSignIn(code, pending);
         }
       }
     }
@@ -343,11 +350,40 @@ export class BlinkPushListener {
       this.requireSignIn();
       return false;
     }
+    this.openSession();
+    return true;
+  }
+
+  /** Trade the code for a session. On failure the link is retired: codes are single use. */
+  private async finishSignIn(
+    code: string,
+    pending: PushSignInPending
+  ): Promise<boolean> {
+    try {
+      this.state.session = await exchangeSignIn(this.http, code, pending);
+    } catch (err) {
+      this.log.warn(
+        `Blink push: sign-in could not be completed: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      this.state.pending = undefined;
+      return false;
+    }
+    this.state.pending = undefined;
+    this.saveState();
+    this.log.info('Blink push: signed in');
+    return true;
+  }
+
+  private openSession(): void {
+    if (!this.state.session) {
+      return;
+    }
     this.auth = new PushAuth(this.state.session, this.http, session => {
       this.state.session = session;
       this.saveState();
     });
-    return true;
   }
 
   /** Drop any session and tell the user how to sign in. */
@@ -356,19 +392,101 @@ export class BlinkPushListener {
     this.receiver = undefined;
     this.auth = undefined;
     this.state.session = undefined;
+    // A new session is a new Blink client: it must be told the token again.
+    this.associatedToken = undefined;
     if (!this.state.pending) {
       this.state.pending = newSignInPending();
     }
     this.saveState();
+    this.logSignIn(reason);
+    this.watchConfig();
+  }
+
+  private watchConfig(): void {
+    if (!this.options.configPath || this.configTimer || this.stopped) {
+      return;
+    }
+    const poll = () => {
+      if (Date.now() - this.signInLoggedAt >= SIGN_IN_REMINDER_MS) {
+        this.logSignIn();
+      }
+      void this.signInFromConfig().catch(err => this.onBackgroundError(err));
+    };
+    this.configTimer = setInterval(
+      poll,
+      this.options.configPollMs ?? CONFIG_POLL_MS
+    );
+    this.configTimer.unref?.();
+  }
+
+  private unwatchConfig(): void {
+    if (this.configTimer) {
+      clearInterval(this.configTimer);
+      this.configTimer = undefined;
+    }
+  }
+
+  /** The callback address saved in config.json for this platform, if any. */
+  private callbackFromConfig(): string | undefined {
+    if (!this.options.configPath) {
+      return undefined;
+    }
+    try {
+      const parsed = JSON.parse(
+        fs.readFileSync(this.options.configPath, 'utf8')
+      ) as { platforms?: Array<Record<string, unknown>> };
+      for (const platform of parsed.platforms ?? []) {
+        const value = platform['push-sign-in-callback'];
+        if (
+          platform.platform === PLATFORM_NAME &&
+          typeof value === 'string' &&
+          value.trim()
+        ) {
+          return value.trim();
+        }
+      }
+    } catch {
+      // half-written or unreadable: the next change is read again
+    }
+    return undefined;
+  }
+
+  /** Finish the pending sign-in from a callback address saved while running. */
+  private async signInFromConfig(): Promise<void> {
+    const pending = this.state.pending;
+    if (!pending || this.state.session || this.stopped || this.exchanging) {
+      return;
+    }
+    const callback = this.callbackFromConfig();
+    const code = callback && callbackCode(callback, pending);
+    if (!code) {
+      return;
+    }
+    this.exchanging = true;
+    try {
+      if (!(await this.finishSignIn(code, pending))) {
+        this.requireSignIn();
+        return;
+      }
+    } finally {
+      this.exchanging = false;
+    }
+    this.unwatchConfig();
+    this.openSession();
+    await this.run();
+  }
+
+  private logSignIn(reason?: string): void {
+    if (!this.state.pending || this.state.session) {
+      return;
+    }
+    this.signInLoggedAt = Date.now();
     this.log.warn(
-      `Blink push notifications need a one-time sign-in${reason ? ` (${reason})` : ''}. ` +
-        'Open this link in a browser on a computer (on a phone the Blink app ' +
-        'takes over the redirect) and sign in to Blink:\n' +
-        `${signInUrl(this.state.pending)}\n` +
-        'Blink then opens an address starting with ' +
-        'https://applinks.blink.com/signin/callback (the page itself may not load). ' +
-        'Copy that full address into the plugin setting "Push sign-in callback" ' +
-        '(push-sign-in-callback) and restart the plugin.'
+      `Blink push: sign in once${reason ? ` (${reason})` : ''}. Open this link on a ` +
+        'computer without the Blink app, sign in, then paste the address of the ' +
+        'page you land on ("Unsupported Browser") into the plugin setting ' +
+        '"Push sign-in callback" and save:\n' +
+        signInUrl(this.state.pending)
     );
   }
 
@@ -428,6 +546,10 @@ export class BlinkPushListener {
     const token = this.receiver?.fcmToken || this.state.credentials?.fcm?.token;
     if (!token) {
       throw new Error('no push token was issued');
+    }
+    // A fresh registration already told Blink about this token.
+    if (token === this.associatedToken) {
+      return;
     }
     if (!this.auth) {
       throw new PushSignInRequiredError('not signed in');

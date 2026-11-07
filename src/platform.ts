@@ -204,6 +204,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         void this.blink
           .startPushNotifications(this.config.storagePath, {
             signInCallback: this.config.pushSignInCallback,
+            configPath: this.api.user.configPath(),
           })
           .catch(err => this.log.warn(`Blink push notifications: ${err}`));
       } else {
