@@ -25,6 +25,20 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pathToFfmpeg: string = require('ffmpeg-for-homebridge');
 
+// Shared by every path that re-encodes live video for HomeKit.
+const H264_LIVE_ENCODER = [
+  '-c:v',
+  'libx264',
+  '-preset',
+  'ultrafast',
+  '-tune',
+  'zerolatency',
+  '-pix_fmt',
+  'yuv420p',
+  '-profile:v',
+  'baseline',
+];
+
 import type { BlinkCamera } from '../devices/camera.js';
 import { ImmiTunnel, RtspToH264Proxy } from '../lib/proxy.js';
 import {
@@ -75,7 +89,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
   private readonly liveViewEnabled: boolean;
   private readonly audioEnabled: boolean;
   private readonly audioFilter: string;
-  private readonly transcodeImmi: boolean;
+  private readonly liveViewTranscode: boolean;
   private readonly streamAddress: string;
   private readonly hideRoutineLogs: boolean;
   controller?: CameraController;
@@ -107,7 +121,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     hideRoutineLogs = false,
     audioFilter = '',
     streamAddress = '',
-    transcodeImmi = false
+    liveViewTranscode = false
   ) {
     this.blinkCamera = blinkCamera;
     this.log = log;
@@ -117,7 +131,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
     this.hideRoutineLogs = hideRoutineLogs;
     this.audioFilter = audioFilter;
     this.streamAddress = streamAddress;
-    this.transcodeImmi = transcodeImmi;
+    this.liveViewTranscode = liveViewTranscode;
   }
 
   async handleSnapshotRequest(
@@ -420,23 +434,17 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         '-map',
         '0:v'
       );
-      if (this.transcodeImmi) {
+      if (this.liveViewTranscode) {
         // Re-encode instead of passing the camera's H.264 through: Blink
         // cameras send sparse keyframes and their own bitrate, so after any
         // packet loss HomeKit stalls (spinner) until the next keyframe and
         // ignores the bitrate/resolution it negotiated. Re-encoding gives a
         // keyframe every 2s at the size and bitrate HomeKit asked for.
+        // Bitrate caps rather than the CRF the RTSP path uses: honoring the
+        // budget HomeKit negotiated is the point here, and the forced
+        // keyframes keep the capped encoder from stalling on a scene change.
         ffmpegArgs.push(
-          '-c:v',
-          'libx264',
-          '-preset',
-          'ultrafast',
-          '-tune',
-          'zerolatency',
-          '-pix_fmt',
-          'yuv420p',
-          '-profile:v',
-          'baseline',
+          ...H264_LIVE_ENCODER,
           '-vf',
           `scale=${video.width}:${video.height}:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2`,
           // Keep the camera's own frame rate (Blink sends fewer than the 30
@@ -486,16 +494,7 @@ export class BlinkCameraDelegate implements CameraStreamingDelegate {
         'passthrough',
         '-map',
         '0:v',
-        '-c:v',
-        'libx264',
-        '-preset',
-        'ultrafast',
-        '-tune',
-        'zerolatency',
-        '-pix_fmt',
-        'yuv420p',
-        '-profile:v',
-        'baseline',
+        ...H264_LIVE_ENCODER,
         '-crf',
         '23',
         '-g',
