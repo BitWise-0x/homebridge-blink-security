@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0-beta.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.4...v2.1.0-beta.5) (2026-11-07)
+
+### Features
+
+* **push:** finish the push sign-in as soon as the callback is saved ([c46de57](https://github.com/BitWise-0x/homebridge-blink-security/commit/c46de57826602b96003d66a15b5bdc87fe27ed1c))
+
+### Bug Fixes
+
+* **doorbell:** ring once when push and polling both see a press ([9b51de4](https://github.com/BitWise-0x/homebridge-blink-security/commit/9b51de4a43a18159fcd972de144ec53a83262ec8))
+
 ## [2.1.0-beta.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.3...v2.1.0-beta.4) (2026-11-07)
 
 ### Bug Fixes
