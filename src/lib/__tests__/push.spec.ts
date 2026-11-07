@@ -212,6 +212,23 @@ describe('BlinkDoorbell.notifyPress', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('does not fire again for the clip Blink stamps when the recording ends', async () => {
+    // Seen live: push at T, cloud clip of the same press stamped T+16s.
+    const pushedAt = Date.now();
+    const { d, onPress } = doorbell(new Date(pushedAt + 16_000).toISOString());
+    d.notifyPress(pushedAt);
+    expect(await d.checkForPress()).toBe(false);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('still fires for a clip of a later, separate press', async () => {
+    const pushedAt = Date.now();
+    const { d, onPress } = doorbell(new Date(pushedAt + 45_000).toISOString());
+    d.notifyPress(pushedAt);
+    expect(await d.checkForPress()).toBe(true);
+    expect(onPress).toHaveBeenCalledTimes(2);
+  });
+
   it('ignores a stale press', () => {
     const { d, onPress } = doorbell();
     expect(d.notifyPress(Date.now() - 10 * 60_000)).toBe(false);

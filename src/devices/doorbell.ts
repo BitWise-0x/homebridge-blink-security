@@ -9,6 +9,7 @@ export type DoorbellPressCallback = (doorbell: BlinkDoorbell) => void;
 export class BlinkDoorbell extends BlinkCamera {
   private _onPress?: DoorbellPressCallback;
   private readonly _initTime = Date.now();
+  private _lastPushPress = 0;
 
   constructor(data: HomescreenCamera, blink: Blink, isOwlDevice = false) {
     super(data, blink, isOwlDevice);
@@ -57,6 +58,13 @@ export class BlinkDoorbell extends BlinkCamera {
       return false;
     }
 
+    // Blink stamps the clip of a press when the recording ends, up to tens
+    // of seconds after the push for the same press arrived. A clip that
+    // close behind a push is that press, already rung.
+    if (eventTime - this._lastPushPress < DOORBELL_PRESS_DECAY_MS) {
+      return false;
+    }
+
     if (eventTime > this.lastDoorbellPress) {
       const age = Date.now() - eventTime;
       if (age < MOTION_TRIGGER_DECAY * 1000) {
@@ -79,11 +87,11 @@ export class BlinkDoorbell extends BlinkCamera {
     if (Date.now() - eventTime >= MOTION_TRIGGER_DECAY * 1000) {
       return false;
     }
-    // Polling may later list the same press as a cloud clip, stamped by
-    // Blink when the press happened. Stamping with the later of arrival time
-    // and Blink's time makes checkForPress treat that clip as reported, even
-    // if this host's clock runs behind Blink's.
+    // Polling may later list the same press as a cloud clip; checkForPress
+    // ignores clips stamped shortly after this push. The later of arrival
+    // time and Blink's time covers a host clock running behind Blink's.
     this.lastDoorbellPress = Math.max(Date.now(), eventTime);
+    this._lastPushPress = this.lastDoorbellPress;
     this._onPress?.(this);
     return true;
   }
