@@ -145,11 +145,11 @@ graph TD
 3. Configure your Blink credentials through the settings panel.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot1.png" width="400" alt="Plugin settings screenshot" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot1.png" width="400" alt="Blink Security plugin settings in the Homebridge UI" />
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot3.png" alt="Homebridge logs" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot3.png" alt="Homebridge log showing the push sign-in and a doorbell press delivered by push" />
 </p>
 
 ### Manual
