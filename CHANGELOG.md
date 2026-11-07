@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0-beta.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.2...v2.1.0-beta.3) (2026-11-07)
+
+### Features
+
+* **liveview:** optional re-encode of IMMI live view (liveview-transcode) ([#86](https://github.com/BitWise-0x/homebridge-blink-security/issues/86)) ([bfb8ce1](https://github.com/BitWise-0x/homebridge-blink-security/commit/bfb8ce1dfeff907c159b192c2bb95e60ea5058d0))
+
 ## [2.1.0-beta.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.1...v2.1.0-beta.2) (2026-11-07)
 
 ### Bug Fixes
