@@ -30,7 +30,7 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
   <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
 </p>
 
-<br>
+---
 
 ## Supported Devices
 
@@ -56,7 +56,7 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 > plugin update. If a device does not appear in HomeKit at all, open an
 > issue with your startup log.
 
-<br>
+---
 
 ## Architecture
 
@@ -105,7 +105,7 @@ graph TD
     ffmpeg -->|"SRTP"| Home
 ```
 
-<br>
+---
 
 ## Features
 
@@ -130,7 +130,7 @@ graph TD
 - **Stale accessory cleanup**: Removes devices no longer on your Blink account
 - **Retry with backoff**: Automatic retry on network errors and rate limiting
 
-<br>
+---
 
 ## Installation
 
@@ -168,7 +168,7 @@ graph TD
    homebridge -D
    ```
 
-<br>
+---
 
 ## 2FA Setup
 
@@ -179,7 +179,34 @@ Blink requires two-factor authentication on first login:
 3. Add the code to the `pin` field in config and restart Homebridge
 4. After successful verification, remove the `pin` field; the session is persisted
 
-<br>
+---
+
+## Push Notifications
+
+Doorbell presses normally reach HomeKit through cloud polling, after the clip uploads, and not at all without a Blink subscription. With `enable-push-notifications: true` the plugin receives Blink's push notifications, the channel the Blink app uses, so a press rings in HomeKit within a second or two, with or without a subscription.
+
+### Sign-in
+
+Blink sends these pushes only to clients of its Android app, so the plugin signs in a second Blink session once, through Blink's own page:
+
+1. Turn on **Push Notifications** and restart. The log prints a Blink sign-in link (repeated every 15 minutes until you sign in).
+2. Open the link on a computer that does not have the Blink app installed. Sign in and enter the code Blink sends by SMS or email.
+3. You land on a page titled "Unsupported Browser". That is the end of the sign-in. Copy the full address from the address bar; it starts with `https://applinks.blink.com/signin/callback?code=`.
+4. Paste it into **Push sign-in callback** right away and save. Blink's codes expire within minutes. No restart is needed: the log shows `Blink push: signed in` and `Blink push notifications connected` within a few seconds. The field can be cleared afterwards.
+
+If the Blink app is installed (on a phone or a Mac) it takes over the redirect and the address never shows. Use another computer, or open the browser's developer tools on the Network tab before signing in: the response that ends the sign-in carries the same address in its `redirect_uri` field.
+
+### How it works
+
+The plugin never sees your password for this session. It registers a Firebase Cloud Messaging token with the Blink app's public Firebase project and asks Blink to deliver the session's notifications to it. The account gets one more signed-in client, named "Homebridge Blink Security"; your phone keeps its own notifications. Polling keeps running, and a press seen both ways rings once.
+
+The protocol is unofficial, worked out by [ha-blink-live-events](https://github.com/CoreyHayward/ha-blink-live-events) and [ha-blink-instant-events](https://github.com/rohanjariwala03/ha-blink-instant-events). A Blink app update can break it; polling keeps working either way.
+
+### Turning it off
+
+Set `enable-push-notifications: false` and restart. The plugin signs the push client out of the Blink account and deletes its saved session. If Blink refuses the sign-out, the log says so; remove the client from the Blink app's account settings.
+
+---
 
 ## Configuration
 
@@ -208,14 +235,17 @@ Blink requires two-factor authentication on first login:
 | `camera-status-polling-seconds`    | integer | `20`       | Camera status polling interval in seconds. Effective cadence rounds up to the next `blink-status-polling-seconds` tick                                                                                                                                                                                                                                                                                                      |
 | `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds. Effectively capped at `blink-status-polling-seconds`; a longer value would only add notification latency without reducing API load                                                                                                                                                                                                                                            |
 | `local-storage-motion`             | string  | `"auto"`   | Detect motion from Sync Module local (USB) storage clips on accounts without cloud clip storage. `"auto"` engages only while no cloud clips exist; `"always"` / `"never"` force it on or off. Local clips are checked every ~20s, clips already on the drive at startup are never replayed as motion, and doorbell button presses are reported as motion on this path (Blink's local manifest does not distinguish presses) |
-| `enable-push-notifications`        | boolean | `false`    | Receive Blink push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Registers this plugin as a notification client on the Blink account (see [Doorbell presses without a Blink subscription](#doorbell-presses-without-a-blink-subscription))                                                                                                                 |
+| `enable-push-notifications`        | boolean | `false`    | Receive Blink push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Registers this plugin as a notification client on the Blink account (see [Push Notifications](#push-notifications))                                                                                                                                                                       |
 | `push-sign-in-callback`            | string  |            | Only for the one-time push sign-in: the address of the page Blink lands on after signing in through the link in the log. Picked up on save; can be cleared once the log says signed in                                                                                                                                                                                                                                      |
 | `logging`                          | string  |            | `"quiet"` suppresses routine chatter (thumbnail refresh, reconfigure, clip recording, sleep). `"verbose"` or `"debug"` for extended logging                                                                                                                                                                                                                                                                                 |
 | `enable-startup-diagnostic`        | boolean | `false`    | Log diagnostic info on startup                                                                                                                                                                                                                                                                                                                                                                                              |
 
-<br>
+---
 
 ## Development
+
+<details>
+<summary>Building, testing and releasing</summary>
 
 ### Prerequisites
 
@@ -274,7 +304,9 @@ Every push to `main` runs [semantic-release](https://semantic-release.gitbook.io
 
 Publishing requires `NPM_TOKEN`, a valid npm automation token, plus the `CI_APP_ID` and `CI_APP_PRIVATE_KEY` secrets of the `bitwise-ci` GitHub App. The Release workflow mints a short-lived App token with contents and pull-requests write access that semantic-release uses to push the changelog commit and tag and to create the GitHub release; the App is a bypass actor on the `main` ruleset, so that push is allowed. The Dependabot auto-merge workflow mints its token the same way. If the Release workflow fails with `EINVALIDNPMTOKEN`, generate a new npm token, update the secret, and re-run the failed job. `EINVALIDGHTOKEN` points at the App: check that it is still installed on the repository and that `CI_APP_PRIVATE_KEY` matches a current key. A run that stops with "local branch main is behind the remote one" published nothing; it happens when another commit reaches `main` mid-run, and the next successful run picks up every unreleased commit.
 
-<br>
+</details>
+
+---
 
 ## Troubleshooting
 
@@ -314,24 +346,27 @@ These settings reset whenever HomeKit sees an accessory as new: re-pairing the b
 
 ### HomeKit notifications arrive later than the Blink app
 
-The Blink app is notified by Blink's push service the moment a camera starts recording. The plugin discovers motion by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided. Doorbell presses avoid the delay with `enable-push-notifications` (see [Doorbell presses without a Blink subscription](#doorbell-presses-without-a-blink-subscription)).
+The Blink app is notified by Blink's push service the moment a camera starts recording. The plugin discovers motion by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided. Doorbell presses avoid the delay with `enable-push-notifications` (see [Push Notifications](#push-notifications)).
 
 ### No motion notifications without a Blink subscription
 
 Accounts without a cloud storage plan have an empty cloud media list, so cloud polling finds nothing to report. Put a USB drive in the Sync Module and enable Local Storage in the Blink app; the plugin then detects motion from the sync module's local storage manifest instead. The startup log shows what the plugin sees, e.g. `Local storage: compatible=true, enabled=true, status=active`. The `local-storage-motion` option controls the fallback; the default `auto` engages it only while the cloud media list is empty.
 
-### Doorbell presses without a Blink subscription
+### Doorbell does not ring without a Blink subscription
 
-Polling finds doorbell presses in the cloud clip list, which stays empty without a Blink subscription, so the doorbell never rings in HomeKit. Set `enable-push-notifications: true` to receive presses from Blink's push notifications instead, the channel the Blink app itself uses. Presses then arrive within a second or two, with or without a subscription, and HomePods play the doorbell chime.
+Polling finds presses in the cloud clip list, which stays empty without a subscription. Turn on [push notifications](#push-notifications).
 
-Blink only sends these pushes to clients of its Android app, so push notifications use a second Blink session, signed in once through Blink's own sign-in page:
+### Push sign-in opens the Blink app
 
-1. Enable the option and restart. The log prints a Blink sign-in link.
-2. Open the link on a computer that does not have the Blink app installed (the app grabs the final redirect, on phones and on Macs alike). Sign in; Blink sends an SMS or email code. If the app is installed and opens anyway, open the browser's developer tools on the Network tab before signing in: the response that ends the sign-in carries the same address in its `redirect_uri` field.
-3. You land on a Blink page titled "Unsupported Browser". That is the end of the sign-in. Copy the full address from the address bar; it starts with `https://applinks.blink.com/signin/callback?code=`.
-4. Paste it into **Push sign-in callback** (`push-sign-in-callback`) and save. Do it right after copying: Blink's codes expire within minutes. The plugin picks the address up on save, no restart; the log shows `Blink push: signed in` and `Blink push notifications connected`. If the log says the code expired, the link printed below it is a fresh one.
+The Blink app, on a phone or a Mac, claims Blink's sign-in redirect. Sign in on a computer without the app, or follow the developer tools step in [Push Notifications](#push-notifications).
 
-The plugin never sees your password for this session. It registers a Firebase Cloud Messaging token for the Blink app's public Firebase project and asks Blink to deliver that session's notifications to it; your phone keeps its own notifications. The protocol is unofficial (worked out by [ha-blink-live-events](https://github.com/CoreyHayward/ha-blink-live-events) and [ha-blink-instant-events](https://github.com/rohanjariwala03/ha-blink-instant-events)), so a Blink app update can break it; polling keeps working either way. Turning the option off signs the push session out of the Blink account at the next restart; if Blink refuses the sign-out, the log says so.
+### Push sign-in says the code expired
+
+Blink's codes last only minutes. Paste the address into **Push sign-in callback** right after copying it, and use the newest link in the log: a failed attempt prints a fresh one.
+
+### Doorbell stops ringing with push notifications on
+
+Look for `Blink push notifications connected` after the last start. If the log shows the sign-in prompt again, Blink ended the push session (a password change does this): sign in again. If it shows `unavailable, retrying`, the plugin reconnects on its own. Presses found by polling still ring in the meantime on accounts with a subscription.
 
 ### Motion notifications point at the Security System instead of the camera
 
@@ -354,13 +389,13 @@ Blink's authentication servers may reject login requests made through a VPN, ret
 
 If you run into issues, check the [Homebridge troubleshooting wiki](https://github.com/homebridge/homebridge/wiki/Basic-Troubleshooting) first. If the problem persists, [open an issue](https://github.com/BitWise-0x/homebridge-blink-security/issues/new/choose) with as much detail as possible.
 
-<br>
+---
 
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature requests, and code contributions.
 
-<br>
+---
 
 ## Useful Resources
 
@@ -371,7 +406,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 - [Homebridge Developer Documentation](https://developers.homebridge.io/)
 - [Apple HomeKit Documentation](https://developer.apple.com/documentation/homekit/)
 
-<br>
+---
 
 ## License
 
@@ -379,7 +414,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 
 <!-- [![FOSSA Status](https://app.fossa.com/api/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security.svg?type=large&issueType=license)](https://app.fossa.com/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security?ref=badge_large&issueType=license) -->
 
-<br>
+---
 
 ## Disclaimer
 
