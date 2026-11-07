@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0-beta.4](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.3...v2.1.0-beta.4) (2026-11-07)
+
+### Bug Fixes
+
+* **deps:** bump follow-redirects from 1.16.1 to 1.16.2 ([da096a5](https://github.com/BitWise-0x/homebridge-blink-security/commit/da096a5361aa73515f60c799d820104e5a909072))
+* **deps:** bump node-forge and homebridge-config-ui-x ([7a48079](https://github.com/BitWise-0x/homebridge-blink-security/commit/7a480790b76db773ec0ea250733933300e86cc30))
+
 ## [2.1.0-beta.3](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.2...v2.1.0-beta.3) (2026-11-07)
 
 ### Features
