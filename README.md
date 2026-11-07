@@ -109,7 +109,7 @@ graph TD
 
 ## Features
 
-- **Live view**: IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras)
+- **Live view**: IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras). Optional re-encode of IMMI video with frequent keyframes for streams that stall in the Home app (`liveview-transcode`)
 - **Security system**: Arm/disarm per network, with optional manual arm switch and opt-in alarm triggering on motion (`enable-alarm-triggering`)
 - **Multi-network**: Supports multiple sync modules, each with independent arm/disarm
 - **Motion detection**: Motion events surfaced to HomeKit by polling the Blink cloud (configurable interval, with debounce). Detection trails the Blink app's own notification by roughly the clip upload time plus one poll cycle
@@ -118,7 +118,7 @@ graph TD
 - **Snapshots**: Thumbnail refresh while the Home app is requesting snapshots, at most once per `camera-thumbnail-refresh-seconds` for each camera with motion detection enabled (armed or disarmed), with caching and retry
 - **Battery**: Battery level and low-battery alerts (Outdoor/Indoor models)
 - **Temperature**: Ambient temperature sensor (Outdoor/Indoor models)
-- **Doorbell press**: Doorbell button presses raised as HomeKit doorbell events. HomeKit delivers the push notification. Detection is via cloud polling, like motion, or within a second or two from Blink's push notifications with `enable-push-notifications`
+- **Doorbell press**: Doorbell button presses raised as HomeKit doorbell events, so HomePods chime and the Home app notifies. Found by cloud polling, like motion, or within a second or two from Blink's push notifications with `enable-push-notifications`, which also works without a Blink subscription
 - **Privacy mode**: Per-camera switch that hides the camera's thumbnail in the Home app
 - **Night vision**: IR illuminator toggle (Outdoor/Indoor models)
 - **Clip recording**: Trigger a clip recording via momentary switch
