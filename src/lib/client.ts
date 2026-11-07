@@ -20,6 +20,12 @@ const TOKEN_WAIT_WARN_MS = 1000;
 // Well under the 30s axios timeout so a stall is visible before it trips.
 const SLOW_REQUEST_WARN_MS = 5000;
 
+// Network failures worth a retry. Besides the reset and timeout cases, the
+// DNS (EAI_AGAIN) and route/connect errors fail before the request leaves
+// the host, so retrying them is safe for every method.
+const TRANSIENT_NETWORK_ERROR =
+  /ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH/;
+
 /** A response Blink answered with an error status, after any retries. */
 export class BlinkHttpError extends Error {
   constructor(
@@ -195,9 +201,12 @@ export class BlinkClient {
       }
     } catch (err) {
       const error = err as Error;
-      if (/ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT/.test(error.message)) {
+      if (TRANSIENT_NETWORK_ERROR.test(error.message)) {
         if (retryCount < 2) {
           const backoffMs = Math.pow(2, retryCount) * 1000;
+          this.log.warn(
+            `Retrying ${method} ${resolvedPath} in ${backoffMs}ms: ${error.message}`
+          );
           await sleep(backoffMs);
           return this._request<T>(
             method,
