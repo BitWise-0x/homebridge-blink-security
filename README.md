@@ -194,13 +194,13 @@ Blink sends these pushes only to clients of its Android app, so the plugin signs
 3. You land on a page titled "Unsupported Browser". That is the end of the sign-in. Copy the full address from the address bar; it starts with `https://applinks.blink.com/signin/callback?code=`.
 4. Paste it into **Push sign-in callback** right away and save. Blink's codes expire within minutes. No restart is needed: the log shows `Blink push: signed in` and `Blink push notifications connected` within a few seconds. The field can be cleared afterwards.
 
-If the Blink app is installed (on a phone or a Mac) it takes over the redirect and the address never shows. Use another computer, or open the browser's developer tools on the Network tab before signing in: the response that ends the sign-in carries the same address in its `redirect_uri` field.
+> **Blink app installed on this computer?** The app, on a phone or a Mac, takes over the redirect and the address never shows. Use another computer, or open the browser's developer tools on the Network tab before signing in: the response that ends the sign-in carries the same address in its `redirect_uri` field.
 
 ### How it works
 
 The plugin never sees your password for this session. It registers a Firebase Cloud Messaging token with the Blink app's public Firebase project and asks Blink to deliver the session's notifications to it. The account gets one more signed-in client, named "Homebridge Blink Security"; your phone keeps its own notifications. Polling keeps running, and a press seen both ways rings once.
 
-The protocol is unofficial, worked out by [ha-blink-live-events](https://github.com/CoreyHayward/ha-blink-live-events) and [ha-blink-instant-events](https://github.com/rohanjariwala03/ha-blink-instant-events). A Blink app update can break it; polling keeps working either way.
+> **Unofficial protocol.** It was worked out by [ha-blink-live-events](https://github.com/CoreyHayward/ha-blink-live-events) and [ha-blink-instant-events](https://github.com/rohanjariwala03/ha-blink-instant-events). A Blink app update can break it; polling keeps working either way.
 
 ### Turning it off
 
@@ -320,7 +320,7 @@ Audio is opt-in. To enable it:
 2. Open the Blink app → Device Settings → Privacy → enable Audio Streaming for each camera
 3. Restart the child bridge
 
-If Audio Streaming is disabled in the Blink app, the camera sends malformed audio metadata that stalls the stream. That is why audio defaults to off.
+> **Why audio is off by default.** If Audio Streaming is disabled in the Blink app, the camera sends malformed audio metadata that stalls the stream.
 
 ### Live View shows "Not responding"
 
@@ -342,7 +342,7 @@ Notification preferences live in iOS, not in the plugin, and they are per access
 
 Arm/disarm alerts have their own toggle: repeat the same steps on the security system tile.
 
-These settings reset whenever HomeKit sees an accessory as new: re-pairing the bridge, removing and re-adding a device, or migrating from another Blink plugin all create new accessories with notifications off, even though the Home app shows the same names. If notifications stop after one of those events, re-enable them.
+> **These settings reset on new accessories.** They reset whenever HomeKit sees an accessory as new: re-pairing the bridge, removing and re-adding a device, or migrating from another Blink plugin all create new accessories with notifications off, even though the Home app shows the same names. If notifications stop after one of those events, re-enable them.
 
 ### HomeKit notifications arrive later than the Blink app
 
