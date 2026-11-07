@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0-beta.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.1...v2.1.0-beta.2) (2026-11-07)
+
+### Bug Fixes
+
+* **client:** retry temporary DNS and connect failures ([838c62a](https://github.com/BitWise-0x/homebridge-blink-security/commit/838c62ad6af1259644c62cece791e4e377a16a25)), closes [#85](https://github.com/BitWise-0x/homebridge-blink-security/issues/85)
+
 ## [2.1.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.10...v2.1.0-beta.1) (2026-11-02)
 
 ### Features
