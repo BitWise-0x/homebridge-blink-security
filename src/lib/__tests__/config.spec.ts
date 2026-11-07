@@ -359,6 +359,16 @@ describe('normalizeConfig', () => {
       expect(opts.enableAudio).toBe(false);
     });
 
+    it('maps liveview-transcode to liveViewTranscode', () => {
+      const opts = normalizeConfig(makeConfig({ 'liveview-transcode': true }));
+      expect(opts.liveViewTranscode).toBe(true);
+    });
+
+    it('defaults liveViewTranscode to false', () => {
+      const opts = normalizeConfig(makeConfig({}));
+      expect(opts.liveViewTranscode).toBe(false);
+    });
+
     it('maps audio-filter to audioFilter', () => {
       const opts = normalizeConfig(
         makeConfig({ 'audio-filter': 'volume=2.0' })
