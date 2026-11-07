@@ -22,9 +22,17 @@ import {
   toAlphanumeric,
   DOORBELL_PRESS_SOURCES,
   MAX_CLIP_FUTURE_SKEW_MS,
+  NON_MOTION_SOURCES,
   type LocalStoragePollState,
 } from './localStorage.js';
 import { ExponentialBackoff } from '../lib/utils.js';
+import {
+  BlinkPushListener,
+  isDoorbellPress,
+  signOutPushSession,
+  type BlinkPushEvent,
+  type PushListenerOptions,
+} from '../lib/push.js';
 
 export { BlinkDevice } from './base.js';
 export { BlinkNetwork } from './network.js';
@@ -133,6 +141,88 @@ export class Blink {
       options.blinkStatusPollingSeconds || MOTION_POLL
     );
     this.snapshotRate = snapshotRate ?? THUMBNAIL_TTL;
+  }
+
+  private pushListener?: BlinkPushListener;
+
+  /**
+   * Listen for Blink push notifications so doorbell presses are seen without
+   * a subscription (the cloud media list stays empty then) and without
+   * waiting for a clip to upload.
+   */
+  async startPushNotifications(
+    storagePath: string,
+    options: PushListenerOptions = {}
+  ): Promise<void> {
+    if (this.pushListener) {
+      return;
+    }
+    this.pushListener = new BlinkPushListener(
+      this.log,
+      storagePath,
+      event => this.handlePushEvent(event),
+      options
+    );
+    await this.pushListener.start();
+  }
+
+  stopPushNotifications(): void {
+    this.pushListener?.stop();
+    this.pushListener = undefined;
+  }
+
+  /** Sign out the push session once push notifications are turned off. */
+  async endPushNotifications(storagePath: string): Promise<void> {
+    this.stopPushNotifications();
+    await signOutPushSession(this.log, storagePath);
+  }
+
+  /** Route a push to the device it is about. */
+  handlePushEvent(event: BlinkPushEvent): void {
+    if (!isDoorbellPress(event)) {
+      return;
+    }
+    const doorbell = this.findPushDoorbell(event);
+    if (!doorbell) {
+      this.log.warn(
+        `Blink push: doorbell press for an unknown doorbell ` +
+          `(camera_id=${event.cameraId}, camera_name=${event.cameraName})`
+      );
+      return;
+    }
+    const eventTime = event.createdAt ? Date.parse(event.createdAt) : NaN;
+    const fired = doorbell.notifyPress(
+      Number.isFinite(eventTime) ? eventTime : Date.now()
+    );
+    if (fired) {
+      this.log.info(`${doorbell.name} - Doorbell pressed (push)`);
+    }
+  }
+
+  private findPushDoorbell(event: BlinkPushEvent): BlinkDoorbell | undefined {
+    if (event.cameraId !== undefined) {
+      const byId = this.doorbells.get(event.cameraId);
+      if (byId) {
+        return byId;
+      }
+    }
+    if (event.cameraName) {
+      const name = event.cameraName.toLowerCase();
+      const byName = [...this.doorbells.values()].filter(
+        d =>
+          String(d.data?.name ?? '').toLowerCase() === name &&
+          (event.networkId === undefined || d.networkID === event.networkId)
+      );
+      if (byName.length === 1) {
+        return byName[0];
+      }
+    }
+    // A press can only come from a doorbell: with one on the account there
+    // is nothing to disambiguate.
+    if (event.cameraId === undefined && this.doorbells.size === 1) {
+      return [...this.doorbells.values()][0];
+    }
+    return undefined;
   }
 
   protected createNetwork(data: NetworkData): BlinkNetwork {
@@ -330,7 +420,7 @@ export class Blink {
     // Use thumbnail from config if available, otherwise check recent
     // media for a newer one (e.g. after a post-stream thumbnail refresh).
     let thumbnail = (raw.thumbnail as string) || current.thumbnail;
-    const lastMedia = await this.getCameraLastMotion(
+    const lastMedia = await this.getCameraLastMedia(
       doorbell.networkID,
       doorbell.cameraID
     ).catch(() => undefined);
@@ -1213,11 +1303,25 @@ export class Blink {
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   }
 
-  async getCameraLastMotion(
+  /** Newest media entry of any kind, for thumbnails. */
+  async getCameraLastMedia(
     networkID: number,
     cameraID?: number
   ): Promise<MediaEntry | undefined> {
     return (await this.getMergedMedia(networkID, cameraID))[0];
+  }
+
+  /**
+   * Newest motion entry. Non-motion captures are skipped rather than ending
+   * the search, so a snapshot posted after a real motion clip does not hide
+   * it. An entry with no source stays motion, as it always has.
+   */
+  async getCameraLastMotion(
+    networkID: number,
+    cameraID?: number
+  ): Promise<MediaEntry | undefined> {
+    const media = await this.getMergedMedia(networkID, cameraID);
+    return media.find(m => !m.source || !NON_MOTION_SOURCES.includes(m.source));
   }
 
   /**
@@ -1254,7 +1358,7 @@ export class Blink {
       return camera.thumbnail;
     }
 
-    const latestMedia = await this.getCameraLastMotion(networkID, cameraID);
+    const latestMedia = await this.getCameraLastMedia(networkID, cameraID);
     if (
       latestMedia?.created_at &&
       Date.parse(latestMedia.created_at) > camera.thumbnailCreatedAt

@@ -31,6 +31,27 @@ export const DEVICE_BRAND = 'Apple';
 export const DEVICE_IDENTIFIER = 'iPhone16,1';
 export const OS_VERSION = '26.1';
 
+// --- Push Session Identity ---
+// Blink only pushes to Firebase tokens of its Android app's clients, so the
+// push session (pushAuth.ts) signs in as the Android app.
+
+export const PUSH_OAUTH_CLIENT_ID = 'android';
+export const PUSH_REDIRECT_URI = 'https://applinks.blink.com/signin/callback';
+// The version the Blink Android app sends, which Blink accepts for client
+// updates.
+export const PUSH_APP_VERSION = '60.0 (29834864)';
+export const PUSH_OS_VERSION = '14';
+// Blink's Cloudflare turns away default HTTP client agents.
+export const PUSH_USER_AGENT = 'Blink/60.0 (Homebridge)';
+
+// Public Firebase client identifiers of the Blink Android app (not secrets).
+export const BLINK_FIREBASE_CONFIG = {
+  projectId: 'blink-6c1ea',
+  appId: '1:351117235468:android:14fb3ef63df2a7c2',
+  apiKey: 'AIzaSyBcgwrpglzCZJPUNNeQQnpBbJAFlas_XAI',
+  messagingSenderId: '351117235468',
+};
+
 // --- OAuth Browser Headers (matches blinkpy's Safari UA for OAuth flow) ---
 
 export const OAUTH_USER_AGENT =

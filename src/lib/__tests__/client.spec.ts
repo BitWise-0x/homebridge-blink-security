@@ -229,6 +229,28 @@ describe('BlinkClient', () => {
       expect(mockRequest).toHaveBeenCalledTimes(3);
     });
 
+    it('retries on a temporary DNS failure (EAI_AGAIN)', async () => {
+      mockRequest
+        .mockRejectedValueOnce(
+          new Error('getaddrinfo EAI_AGAIN rest-e011.immedia-semi.com')
+        )
+        .mockResolvedValueOnce({
+          status: 200,
+          statusText: 'OK',
+          data: { ok: true },
+        });
+
+      const result = await client.get('/test', 0);
+      expect(result).toEqual({ ok: true });
+      expect(mockRequest).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry non-network errors', async () => {
+      mockRequest.mockRejectedValueOnce(new Error('certificate has expired'));
+      await expect(client.get('/test', 0)).rejects.toThrow('certificate');
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
     it('throws after exhausting retries', async () => {
       mockRequest
         .mockRejectedValueOnce(new Error('ECONNRESET'))

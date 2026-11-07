@@ -188,7 +188,7 @@ export class BlinkCamera extends BlinkDevice {
       this.cameraID
     );
     if (!lastMotion) {
-      this.traceMotion('no media for this camera');
+      this.traceMotion('no motion media for this camera');
       return false;
     }
 

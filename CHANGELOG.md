@@ -3,6 +3,42 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.10...v2.1.0-beta.1) (2026-11-02)
+
+### Features
+
+* **push:** doorbell presses from Blink push notifications ([#92](https://github.com/BitWise-0x/homebridge-blink-security/issues/92)) ([7644670](https://github.com/BitWise-0x/homebridge-blink-security/commit/7644670dc8dd02acedcf0e352388986809a5080b))
+
+## [2.0.10](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.9...v2.0.10) (2026-10-30)
+
+### Bug Fixes
+
+* **deps:** bump axios ([366d52a](https://github.com/BitWise-0x/homebridge-blink-security/commit/366d52ac9c00e3be74b7653d5c67808bb09f245a))
+
+## [2.0.9](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.8...v2.0.9) (2026-10-29)
+
+### Bug Fixes
+
+* **motion:** ignore snapshot media when detecting motion ([af59fec](https://github.com/BitWise-0x/homebridge-blink-security/commit/af59fecf59d0d362f57b5fe7d70156a6124d9374))
+
+## [2.0.8](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.7...v2.0.8) (2026-10-29)
+
+### Bug Fixes
+
+* **deps:** pin systeminformation to 5.33.18 ([bc3bf8b](https://github.com/BitWise-0x/homebridge-blink-security/commit/bc3bf8b4f3b084fa1b9b8c6b69f2130f19d6959e))
+
+## [2.0.7](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.6...v2.0.7) (2026-10-29)
+
+### Bug Fixes
+
+* **engines:** support Node.js 26 ([d6e2272](https://github.com/BitWise-0x/homebridge-blink-security/commit/d6e22726c57cb6d7b5b6740760f63e05602fb5fe)), closes [#90](https://github.com/BitWise-0x/homebridge-blink-security/issues/90)
+
+## [2.0.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.5...v2.0.6) (2026-10-21)
+
+### Bug Fixes
+
+* **deps:** bump follow-redirects from 1.16.0 to 1.16.1 ([937ba59](https://github.com/BitWise-0x/homebridge-blink-security/commit/937ba59e3e40027f23e1f765f3f10bf1f61a318d))
+
 ## [2.0.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.4...v2.0.5) (2026-10-19)
 
 ### Bug Fixes

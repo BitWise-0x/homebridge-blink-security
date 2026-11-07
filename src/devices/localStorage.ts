@@ -10,8 +10,13 @@ export const LOCAL_STORAGE_SOURCE = 'local_storage';
 
 // Media sources that represent a doorbell button press. Blink has been
 // observed using both spellings; anything else (pir, liveview, local
-// storage clips) is motion, not a press.
+// storage clips) is motion, not a press, except NON_MOTION_SOURCES below.
 export const DOORBELL_PRESS_SOURCES = ['button', 'button_press'];
+
+// Media sources that are captures, not motion events, and must never trip
+// motion. "snapshot" is the summary clip Blink's Photo Capture feature posts
+// of a camera's scheduled snapshots.
+export const NON_MOTION_SOURCES = ['snapshot'];
 
 // A clip dated more than this far ahead of local time is treated as clock
 // skew on the sync module rather than a real recording. Storing it would
