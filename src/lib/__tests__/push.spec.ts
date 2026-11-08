@@ -782,6 +782,45 @@ describe('BlinkPushListener', () => {
     ).toBe(true);
   });
 
+  it('turns push off, without retrying, when Blink rejects the app version', async () => {
+    vi.useFakeTimers();
+    writeState({ session });
+    const { receiver } = fakeReceiver();
+    const http = vi.fn(async () => ({ status: 426, data: {}, headers: {} }));
+    const log = makeLog();
+    const listener = new BlinkPushListener(log, dir, vi.fn(), {
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http: http as unknown as PushHttp,
+    });
+    await listener.start();
+    expect(listener.connected).toBe(false);
+    expect(
+      vi
+        .mocked(log.warn)
+        .mock.calls.some(c =>
+          String(c[0]).includes('turned off until the next restart')
+        )
+    ).toBe(true);
+    const calls = http.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
+    expect(http.mock.calls.length).toBe(calls);
+    expect(receiver.destroy).toHaveBeenCalled();
+  });
+
+  it('reports connected once the token is registered', async () => {
+    writeState({ session });
+    const { receiver } = fakeReceiver();
+    const listener = new BlinkPushListener(makeLog(), dir, vi.fn(), {
+      receiverFactory: (() => receiver) as unknown as ReceiverFactory,
+      http: fakeHttp().http,
+    });
+    expect(listener.connected).toBe(false);
+    await listener.start();
+    expect(listener.connected).toBe(true);
+    listener.stop();
+    expect(listener.connected).toBe(false);
+  });
+
   it('retries with backoff when the first connection fails', async () => {
     vi.useFakeTimers();
     writeState({ session });

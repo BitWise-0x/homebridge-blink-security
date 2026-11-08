@@ -63,6 +63,17 @@ export type PushHttp = (request: {
   json?: unknown;
 }) => Promise<HttpResponse>;
 
+/**
+ * Blink rejected the Android app version this plugin presents (HTTP 426).
+ * Retrying cannot help until the plugin is updated.
+ */
+export class PushAppVersionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PushAppVersionError';
+  }
+}
+
 /** Blink refused this session: a new sign-in is needed. */
 export class PushSignInRequiredError extends Error {
   constructor(message: string) {
@@ -334,6 +345,11 @@ export class PushAuth {
     if (res.status === 401) {
       throw new PushSignInRequiredError(
         'Blink refused the push session (HTTP 401)'
+      );
+    }
+    if (res.status === 426) {
+      throw new PushAppVersionError(
+        `Blink no longer accepts the app version push uses (${method} ${path}, HTTP 426)`
       );
     }
     if (res.status >= 400) {

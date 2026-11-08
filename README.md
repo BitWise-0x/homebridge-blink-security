@@ -198,9 +198,13 @@ Blink sends these pushes only to clients of its Android app, so the plugin signs
 
 ### How it works
 
-The plugin never sees your password for this session. It registers a Firebase Cloud Messaging token with the Blink app's public Firebase project and asks Blink to deliver the session's notifications to it. The account gets one more signed-in client, named "Homebridge Blink Security"; your phone keeps its own notifications. Polling keeps running, and a press seen both ways rings once.
+The plugin never sees your password for this session. It registers a Firebase Cloud Messaging token with the Blink app's public Firebase project and asks Blink to deliver the session's notifications to it. The account gets one more signed-in client, named "Homebridge Blink Security"; your phone keeps its own notifications.
+
+Push covers doorbell presses only. Motion, arm state, battery and thumbnails still come from polling, so polling keeps running. A press seen both ways rings once.
 
 > **Unofficial protocol.** It was worked out by [ha-blink-live-events](https://github.com/CoreyHayward/ha-blink-live-events) and [ha-blink-instant-events](https://github.com/rohanjariwala03/ha-blink-instant-events). A Blink app update can break it; polling keeps working either way.
+
+> **Blink limits third-party access.** Blink's [terms](https://blinkforhome.com/terms-of-service) prohibit reverse engineering and allow suspending accounts whose use differs from normal use. Blink has temporarily disabled accounts that polled too often and locked sign-ins for 60 minutes after repeated logins. The plugin backs off when Blink rate-limits it, waits out a sign-in lockout instead of retrying in a loop, and turns push off if Blink stops accepting it. Lowering `blink-status-polling-seconds` below the default raises the risk.
 
 ### Turning it off
 

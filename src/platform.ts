@@ -38,6 +38,15 @@ const POLL_CYCLE_TIMEOUT_MS = 40000;
 // response must not cost the user rooms, names, scenes and automations.
 const ACCESSORY_REMOVAL_GRACE_MS = 5 * 60 * 1000;
 
+// Startup retries back off rather than repeat every 30s: each one is a full
+// sign-in, and repeated sign-ins are what trigger Blink's login lockout.
+const INIT_RETRY_MIN_MS = 30_000;
+const INIT_RETRY_MAX_MS = 30 * 60_000;
+// Blink's login lockout ("Login limit exceeded", code 106) lasts 60 minutes;
+// signing in again before then only extends it.
+const LOGIN_LOCKOUT_MS = 60 * 60_000;
+const LOGIN_LOCKOUT = /\b429\b|login limit|"code"\s*:\s*106/i;
+
 type DeviceKind = 'Network' | 'Camera' | 'Doorbell' | 'Siren';
 
 const CANONICAL_ID = /^Blink:Network:(\d+)(?::(Camera|Doorbell|Siren):(\d+))?$/;
@@ -70,6 +79,13 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private authClient?: BlinkAuthClient;
   private pollTimer?: ReturnType<typeof setTimeout>;
   private readonly pollBackoff: ExponentialBackoff;
+
+  private readonly initBackoff = new ExponentialBackoff(
+    INIT_RETRY_MIN_MS,
+    INIT_RETRY_MAX_MS
+  );
+
+  private initTimer?: ReturnType<typeof setTimeout>;
 
   private securityAccessories: SecuritySystemAccessory[] = [];
   private cameraAccessories: CameraAccessory[] = [];
@@ -118,6 +134,9 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
   private shutdown(): void {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
+    }
+    if (this.initTimer) {
+      clearTimeout(this.initTimer);
     }
     this.blink?.stopPushNotifications();
     // Streams outlive the process otherwise: ffmpeg children are detached and
@@ -196,6 +215,7 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
 
       this.lastDeviceFingerprint = this.deviceFingerprint();
       this.syncAccessories();
+      this.initBackoff.reset();
       this.schedulePoll();
 
       if (this.config.pushNotifications) {
@@ -228,8 +248,21 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
         );
         return;
       }
-      this.log.error('Blink initialization failed. Retrying in 30 seconds...');
-      setTimeout(() => this.init(), 30000);
+      let delayMs = this.initBackoff.delayMs;
+      if (LOGIN_LOCKOUT.test(errMsg)) {
+        delayMs = Math.max(delayMs, LOGIN_LOCKOUT_MS);
+        this.log.error(
+          'Blink is limiting sign-ins for this account. Not signing in again ' +
+            `for ${Math.round(delayMs / 60_000)} minutes; stop other Blink ` +
+            'automations in the meantime.'
+        );
+      } else {
+        this.log.error(
+          `Blink initialization failed. Retrying in ${Math.round(delayMs / 1000)} seconds...`
+        );
+      }
+      this.initBackoff.increment();
+      this.initTimer = setTimeout(() => this.init(), delayMs);
     }
   }
 
@@ -546,7 +579,11 @@ export class BlinkSecurityPlatform implements DynamicPlatformPlugin {
       clearTimeout(this.pollTimer);
     }
 
-    const delayMs = this.pollBackoff.delayMs;
+    let delayMs = this.pollBackoff.delayMs;
+    const pausedUntil = this.blink?.rateLimitedUntil ?? 0;
+    if (pausedUntil) {
+      delayMs = Math.max(delayMs, pausedUntil - Date.now());
+    }
     this.pollTimer = setTimeout(() => this.poll(), delayMs);
   }
 

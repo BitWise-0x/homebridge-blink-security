@@ -166,6 +166,11 @@ export class Blink {
     await this.pushListener.start();
   }
 
+  /** When a 429 pause on Blink requests ends, or 0. */
+  get rateLimitedUntil(): number {
+    return this.api.client.rateLimitedUntil;
+  }
+
   stopPushNotifications(): void {
     this.pushListener?.stop();
     this.pushListener = undefined;
