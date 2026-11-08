@@ -34,7 +34,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 This project and everyone participating in it is governed by the
 [Homebridge Blink Security Plugin Code of Conduct](https://github.com/BitWise-0x/homebridge-blink-security/blob/main/CODE_OF_CONDUCT.md).
 By participating, you are expected to uphold this code. Please report unacceptable behavior
-to rob@bitwise0x.com.
+to support@bitwise0x.com.
 
 ## I Have a Question
 
