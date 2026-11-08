@@ -25,7 +25,7 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 </span>
 <br><br>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/homebridge-status.png" width="900" alt="Homebridge status page with the HomeKit pairing code and Blink Security log lines" />
 </p>
 
 ---
