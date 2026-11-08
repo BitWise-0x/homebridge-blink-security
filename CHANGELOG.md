@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.11...v2.1.0) (2026-11-08)
+
+### NEW! Features
+
+* **push:** doorbell presses from Blink push notifications ([#92](https://github.com/BitWise-0x/homebridge-blink-security/issues/92)) ([7644670](https://github.com/BitWise-0x/homebridge-blink-security/commit/7644670dc8dd02acedcf0e352388986809a5080b))
+* **push:** finish the push sign-in as soon as the callback is saved ([c46de57](https://github.com/BitWise-0x/homebridge-blink-security/commit/c46de57826602b96003d66a15b5bdc87fe27ed1c))
+* **liveview:** optional re-encode of IMMI live view (liveview-transcode) ([#86](https://github.com/BitWise-0x/homebridge-blink-security/issues/86)) ([bfb8ce1](https://github.com/BitWise-0x/homebridge-blink-security/commit/bfb8ce1dfeff907c159b192c2bb95e60ea5058d0))
+
+### Bug Fixes
+
+* **client:** retry temporary DNS and connect failures ([838c62a](https://github.com/BitWise-0x/homebridge-blink-security/commit/838c62ad6af1259644c62cece791e4e377a16a25)), closes [#85](https://github.com/BitWise-0x/homebridge-blink-security/issues/85)
+* **doorbell:** ring once when push and polling both see a press ([9b51de4](https://github.com/BitWise-0x/homebridge-blink-security/commit/9b51de4a43a18159fcd972de144ec53a83262ec8))
+* **push:** show the sign-in prompt as numbered steps and repeat it every 5 minutes ([fba501d](https://github.com/BitWise-0x/homebridge-blink-security/commit/fba501defec5f57e01941bbde1c705ee7f0b3eb2))
+
 ## [2.1.0-beta.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.5...v2.1.0-beta.6) (2026-11-08)
 
 ### Bug Fixes
