@@ -48,7 +48,7 @@ const RETRY_MAX_MS = 30 * 60_000;
 // network or bind-mounted volume. Only runs while a sign-in is pending.
 const CONFIG_POLL_MS = 2000;
 // The sign-in link scrolls out of a busy log; repeat it while still needed.
-const SIGN_IN_REMINDER_MS = 15 * 60_000;
+const SIGN_IN_REMINDER_MS = 5 * 60_000;
 
 const DOORBELL_EVENT_TYPES = ['button_press'];
 
@@ -481,13 +481,19 @@ export class BlinkPushListener {
       return;
     }
     this.signInLoggedAt = Date.now();
-    this.log.warn(
-      `Blink push: sign in once${reason ? ` (${reason})` : ''}. Open this link on a ` +
-        'computer without the Blink app, sign in, then paste the address of the ' +
-        'page you land on ("Unsupported Browser") into the plugin setting ' +
-        '"Push sign-in callback" and save:\n' +
-        signInUrl(this.state.pending)
-    );
+    // One step per line and the link alone on its own, so the prompt can be
+    // followed and the link copied in a busy log.
+    const reasonText = reason ? ` (${reason})` : '';
+    for (const line of [
+      `Blink push: sign-in needed${reasonText}. One time only:`,
+      '  1. Open this link on a computer without the Blink app installed:',
+      `     ${signInUrl(this.state.pending)}`,
+      '  2. Sign in and enter the code Blink sends you.',
+      '  3. On the "Unsupported Browser" page, copy the address from the address bar.',
+      '  4. Paste it into "Push sign-in callback" in the plugin settings and save. No restart needed.',
+    ]) {
+      this.log.warn(line);
+    }
   }
 
   private scheduleRetry(): void {

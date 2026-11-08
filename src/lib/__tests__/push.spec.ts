@@ -393,7 +393,10 @@ describe('BlinkPushListener', () => {
     });
     await listener.start();
     expect(receiver.connect).not.toHaveBeenCalled();
-    const warning = String(vi.mocked(log.warn).mock.calls[0][0]);
+    const warning = vi
+      .mocked(log.warn)
+      .mock.calls.map(c => String(c[0]))
+      .join('\n');
     expect(warning).toContain(
       'https://api.oauth.blink.com/oauth/v2/authorize?'
     );
@@ -655,11 +658,11 @@ describe('BlinkPushListener', () => {
     const reminders = () =>
       vi
         .mocked(log.warn)
-        .mock.calls.filter(c => String(c[0]).includes('sign in once')).length;
+        .mock.calls.filter(c => String(c[0]).includes('sign-in needed')).length;
     expect(reminders()).toBe(1);
-    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    await vi.advanceTimersByTimeAsync(4 * 60_000);
     expect(reminders()).toBe(1);
-    await vi.advanceTimersByTimeAsync(6 * 60_000);
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
     expect(reminders()).toBe(2);
     listener.stop();
   });
@@ -770,9 +773,13 @@ describe('BlinkPushListener', () => {
     });
     await listener.start();
     expect(listener.signedIn).toBe(false);
-    expect(String(vi.mocked(log.warn).mock.calls.at(-1)?.[0])).toContain(
-      'Blink push: sign in once'
-    );
+    expect(
+      vi
+        .mocked(log.warn)
+        .mock.calls.some(c =>
+          String(c[0]).includes('Blink push: sign-in needed')
+        )
+    ).toBe(true);
   });
 
   it('retries with backoff when the first connection fails', async () => {

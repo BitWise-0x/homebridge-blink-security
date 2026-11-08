@@ -189,7 +189,7 @@ Doorbell presses normally reach HomeKit through cloud polling, after the clip up
 
 Blink sends these pushes only to clients of its Android app, so the plugin signs in a second Blink session once, through Blink's own page:
 
-1. Turn on **Push Notifications** and restart. The log prints a Blink sign-in link (repeated every 15 minutes until you sign in).
+1. Turn on **Push Notifications** and restart. The log prints a Blink sign-in link (repeated every 5 minutes until you sign in).
 2. Open the link on a computer that does not have the Blink app installed. Sign in and enter the code Blink sends by SMS or email.
 3. You land on a page titled "Unsupported Browser". That is the end of the sign-in. Copy the full address from the address bar; it starts with `https://applinks.blink.com/signin/callback?code=`.
 4. Paste it into **Push sign-in callback** right away and save. Blink's codes expire within minutes. No restart is needed: the log shows `Blink push: signed in` and `Blink push notifications connected` within a few seconds. The field can be cleared afterwards.
