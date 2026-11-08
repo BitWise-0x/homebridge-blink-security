@@ -5,6 +5,7 @@ import pushReceiverModule from '@eneris/push-receiver';
 import type * as Types from '@eneris/push-receiver/dist/types.js';
 
 import {
+  PushAppVersionError,
   PushAuth,
   PushSignInRequiredError,
   callbackCode,
@@ -255,6 +256,7 @@ export class BlinkPushListener {
   private readonly backoff = new ExponentialBackoff(RETRY_MIN_MS, RETRY_MAX_MS);
   private retryTimer?: ReturnType<typeof setTimeout>;
   private stopped = false;
+  private live = false;
   private configTimer?: ReturnType<typeof setInterval>;
   private signInLoggedAt = 0;
   private exchanging = false;
@@ -279,6 +281,11 @@ export class BlinkPushListener {
     return this.state.session !== undefined;
   }
 
+  /** True while pushes are being received. */
+  get connected(): boolean {
+    return this.live;
+  }
+
   async start(): Promise<void> {
     this.stopped = false;
     this.loadState();
@@ -299,6 +306,10 @@ export class BlinkPushListener {
       }
       if (err instanceof PushSignInRequiredError) {
         this.requireSignIn(err.message);
+        return;
+      }
+      if (err instanceof PushAppVersionError) {
+        this.giveUp(err);
         return;
       }
       this.log.warn(
@@ -323,6 +334,7 @@ export class BlinkPushListener {
       /* best effort on the way out */
     }
     this.receiver = undefined;
+    this.live = false;
   }
 
   /**
@@ -390,6 +402,7 @@ export class BlinkPushListener {
   private requireSignIn(reason?: string): void {
     this.receiver?.destroy();
     this.receiver = undefined;
+    this.live = false;
     this.auth = undefined;
     this.state.session = undefined;
     // A new session is a new Blink client: it must be told the token again.
@@ -502,6 +515,7 @@ export class BlinkPushListener {
     }
     this.receiver?.destroy();
     this.receiver = undefined;
+    this.live = false;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
       void this.start();
@@ -536,12 +550,24 @@ export class BlinkPushListener {
       return;
     }
     await this.associate();
+    this.live = true;
     this.log.info('Blink push notifications connected');
+  }
+
+  /** Stop push for this run; polling keeps doorbell presses working. */
+  private giveUp(err: Error): void {
+    this.stop();
+    this.log.warn(
+      `Blink push notifications turned off until the next restart: ${err.message}. ` +
+        'Doorbell presses fall back to polling, which needs a Blink subscription. A plugin update is needed.'
+    );
   }
 
   private onBackgroundError(err: unknown): void {
     if (err instanceof PushSignInRequiredError) {
       this.requireSignIn(err.message);
+    } else if (err instanceof PushAppVersionError) {
+      this.giveUp(err);
     } else {
       this.log.warn(`Blink push: ${err instanceof Error ? err.message : err}`);
     }

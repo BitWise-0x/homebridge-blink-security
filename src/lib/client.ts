@@ -26,6 +26,48 @@ const SLOW_REQUEST_WARN_MS = 5000;
 const TRANSIENT_NETWORK_ERROR =
   /ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH/;
 
+// Pause after a 429 when Blink sends no Retry-After: short at first so motion
+// polling resumes quickly, doubling while 429s keep coming. Retrying within
+// seconds is what turns a rate limit into a login lockout or account review.
+export const RATE_LIMIT_PAUSE_MS = 60_000;
+export const RATE_LIMIT_PAUSE_MAX_MS = 15 * 60_000;
+
+/** Blink rate-limited this account; no request is sent until `until`. */
+export class BlinkRateLimitError extends Error {
+  constructor(readonly until: number) {
+    super(
+      `Blink rate limit: pausing requests until ${new Date(until).toLocaleTimeString()}`
+    );
+    this.name = 'BlinkRateLimitError';
+  }
+}
+
+/**
+ * The pause after a 429: Retry-After (seconds or an HTTP date) when Blink
+ * sends one, otherwise a backoff that doubles with each consecutive 429.
+ */
+export function rateLimitPauseMs(
+  retryAfter: unknown,
+  strikes = 0,
+  now = Date.now()
+): number {
+  const backoff = Math.min(
+    RATE_LIMIT_PAUSE_MS * 2 ** strikes,
+    RATE_LIMIT_PAUSE_MAX_MS
+  );
+  if (typeof retryAfter === 'string' && retryAfter.trim()) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.max(seconds * 1000, backoff);
+    }
+    const at = Date.parse(retryAfter);
+    if (!Number.isNaN(at) && at > now) {
+      return Math.max(at - now, backoff);
+    }
+  }
+  return backoff;
+}
+
 /** A response Blink answered with an error status, after any retries. */
 export class BlinkHttpError extends Error {
   constructor(
@@ -43,6 +85,8 @@ export class BlinkClient {
   private readonly client: AxiosInstance;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inflight = new Map<string, Promise<unknown>>();
+  private pausedUntil = 0;
+  private rateLimitStrikes = 0;
 
   constructor(authClient: BlinkAuthClient, log: Logger) {
     this.authClient = authClient;
@@ -70,6 +114,11 @@ export class BlinkClient {
       }
       return config;
     });
+  }
+
+  /** When a 429 pause ends, or 0 when requests are allowed. */
+  get rateLimitedUntil(): number {
+    return this.pausedUntil > Date.now() ? this.pausedUntil : 0;
   }
 
   get accountID(): number | undefined {
@@ -152,6 +201,9 @@ export class BlinkClient {
     retryCount = 0,
     expectedStatuses: readonly number[] = []
   ): Promise<T> {
+    if (this.rateLimitedUntil) {
+      throw new BlinkRateLimitError(this.pausedUntil);
+    }
     const resolvedPath = this.resolvePath(path);
     const cacheKey = `${method}:${resolvedPath}`;
 
@@ -222,6 +274,9 @@ export class BlinkClient {
     }
 
     this.log.debug(`${res.status} ${res.statusText}`);
+    if (res.status < 400) {
+      this.rateLimitStrikes = 0;
+    }
 
     // 401 — refresh token and retry once
     if (res.status === 401 && retryCount < 1) {
@@ -267,21 +322,15 @@ export class BlinkClient {
       );
     }
 
-    // 429 — exponential backoff retry
-    if (res.status === 429 && retryCount < 2) {
-      const backoffMs = Math.pow(2, retryCount) * 1000;
-      this.log.error(
-        `RETRY: ${method} ${resolvedPath} (${res.status} Rate limited) — retrying in ${backoffMs}ms`
-      );
-      await sleep(backoffMs);
-      return this._request<T>(
-        method,
-        path,
-        body,
-        maxTTL,
-        retryCount + 1,
-        expectedStatuses
-      );
+    // 429: stop every request for the pause Blink asks for, never retry.
+    if (res.status === 429) {
+      this.pausedUntil =
+        Date.now() +
+        rateLimitPauseMs(res.headers?.['retry-after'], this.rateLimitStrikes);
+      this.rateLimitStrikes++;
+      const err = new BlinkRateLimitError(this.pausedUntil);
+      this.log.warn(`${method} ${resolvedPath} (429): ${err.message}`);
+      throw err;
     }
 
     // 409 — busy (command in progress)

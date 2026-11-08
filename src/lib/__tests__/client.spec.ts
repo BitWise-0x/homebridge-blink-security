@@ -26,7 +26,13 @@ vi.mock('../utils.js', () => ({
   sleep: vi.fn(() => Promise.resolve()),
 }));
 
-import { BlinkClient, BlinkHttpError } from '../client.js';
+import {
+  BlinkClient,
+  BlinkHttpError,
+  BlinkRateLimitError,
+  RATE_LIMIT_PAUSE_MS,
+  rateLimitPauseMs,
+} from '../client.js';
 import type { BlinkAuthClient } from '../auth.js';
 import type { Logger } from 'homebridge';
 
@@ -318,24 +324,39 @@ describe('BlinkClient', () => {
     });
   });
 
-  describe('429 retry', () => {
-    it('retries on 429 with backoff', async () => {
-      const { sleep } = await import('../utils.js');
-      mockRequest
-        .mockResolvedValueOnce({
-          status: 429,
-          statusText: 'Too Many Requests',
-          data: {},
-        })
-        .mockResolvedValueOnce({
-          status: 200,
-          statusText: 'OK',
-          data: { ok: true },
-        });
+  describe('429 rate limit', () => {
+    it('does not retry, and pauses every request for Retry-After', async () => {
+      mockRequest.mockResolvedValueOnce({
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { 'retry-after': '600' },
+        data: {},
+      });
 
-      const result = await client.get('/test', 0);
-      expect(result).toEqual({ ok: true });
-      expect(sleep).toHaveBeenCalled();
+      const before = Date.now();
+      await expect(client.get('/test', 0)).rejects.toBeInstanceOf(
+        BlinkRateLimitError
+      );
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+      expect(client.rateLimitedUntil).toBeGreaterThanOrEqual(before + 600_000);
+
+      // Paused: nothing reaches the network until the pause ends.
+      await expect(client.get('/other', 0)).rejects.toBeInstanceOf(
+        BlinkRateLimitError
+      );
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('pauses one minute at first, doubling while 429s continue', () => {
+      const now = Date.now();
+      expect(rateLimitPauseMs(undefined, 0, now)).toBe(RATE_LIMIT_PAUSE_MS);
+      expect(rateLimitPauseMs(undefined, 1, now)).toBe(2 * RATE_LIMIT_PAUSE_MS);
+      expect(rateLimitPauseMs(undefined, 10, now)).toBe(15 * 60_000);
+      expect(rateLimitPauseMs('2', 0, now)).toBe(RATE_LIMIT_PAUSE_MS);
+      expect(rateLimitPauseMs('900', 0, now)).toBe(900_000);
+      expect(
+        rateLimitPauseMs(new Date(now + 20 * 60_000).toUTCString(), 0, now)
+      ).toBeGreaterThan(19 * 60_000);
     });
   });
 
