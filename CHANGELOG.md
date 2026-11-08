@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.0-beta.6](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.5...v2.1.0-beta.6) (2026-11-08)
+
+### Bug Fixes
+
+* **push:** show the sign-in prompt as numbered steps and repeat it every 5 minutes ([fba501d](https://github.com/BitWise-0x/homebridge-blink-security/commit/fba501defec5f57e01941bbde1c705ee7f0b3eb2))
+
 ## [2.1.0-beta.5](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0-beta.4...v2.1.0-beta.5) (2026-11-07)
 
 ### Features
