@@ -34,7 +34,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 This project and everyone participating in it is governed by the
 [Homebridge Blink Security Plugin Code of Conduct](https://github.com/BitWise-0x/homebridge-blink-security/blob/main/CODE_OF_CONDUCT.md).
 By participating, you are expected to uphold this code. Please report unacceptable behavior
-to .
+to rob@bitwise0x.com.
 
 ## I Have a Question
 
@@ -164,7 +164,7 @@ Commits must follow the [Conventional Commits standard](https://www.conventional
 
 ### Dependencies
 
-Dependency bumps are handled by Dependabot, with auto-merge for patch and minor updates and manual review for majors. Before bumping a version by hand or editing the `overrides` block in `package.json`, read [Dependency Updates](README.md#dependency-updates) in the README.
+Dependency updates are automated. Leave version bumps and the `overrides` block in `package.json` out of pull requests.
 
 <!-- omit in toc -->
 
