@@ -146,6 +146,8 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/BitWis
 
 See the Development Section in the [README.md](README.md) for information on setting up your development environment.
 
+Open pull requests against the `beta` branch. `main` only takes merges from `beta` when a release is cut.
+
 ### Improving The Documentation
 
 Please submit a PR with your changes to the documentation. The main documentation is located in the [README.md](README.md) file.
