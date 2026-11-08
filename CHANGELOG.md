@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.1-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.0...v2.1.1-beta.1) (2026-11-08)
+
+### Bug Fixes
+
+* back off on Blink rate limits and sign-in lockouts instead of retrying ([b0ba6b4](https://github.com/BitWise-0x/homebridge-blink-security/commit/b0ba6b413ce676b9fbe934b099a597819b64123b))
+
 ## [2.1.0](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.0.11...v2.1.0) (2026-11-08)
 
 ### NEW! Features
