@@ -1,0 +1,32 @@
+name: Source Branch
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize, edited]
+
+permissions: {}
+
+jobs:
+  source-branch:
+    name: source-branch
+    runs-on: ubuntu-latest
+    steps:
+      # Releases are cut by merging beta into main, so main only takes pull
+      # requests from this repository's beta branch. Dependabot security updates
+      # are the exception: GitHub always opens them against the default branch,
+      # whatever target-branch says, and Sync Beta carries them back to beta.
+      - name: Only beta merges into main
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          if [ "$HEAD_REF" = beta ] && [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+            exit 0
+          fi
+          if [ "$AUTHOR" = 'dependabot[bot]' ]; then
+            exit 0
+          fi
+          echo "::error::Pull requests into main must come from beta (this one is from $HEAD_REPO:$HEAD_REF). Open it against beta instead."
+          exit 1

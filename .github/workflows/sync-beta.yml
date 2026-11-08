@@ -1,0 +1,50 @@
+name: Sync Beta
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-beta
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync Beta
+    # A release adds its changelog commit to main only, leaving beta one commit
+    # behind; Dependabot security fixes also land on main directly. Bring them
+    # back to beta so the next promotion merges cleanly.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      # The bitwise-ci App is a bypass actor on the beta ruleset, so it can push.
+      - name: Mint App token
+        id: apptoken
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+      - name: Checkout beta
+        uses: actions/checkout@v6
+        with:
+          ref: beta
+          fetch-depth: 0
+          token: ${{ steps.apptoken.outputs.token }}
+      - name: Merge main into beta
+        run: |
+          git config user.name 'bitwise-ci[bot]'
+          git config user.email '333882660+bitwise-ci[bot]@users.noreply.github.com'
+          git fetch origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo 'beta already contains main'
+            exit 0
+          fi
+          # No [skip ci] here: a promotion PR opened from this commit needs its
+          # checks to run. A conflict fails the job, to be resolved by hand.
+          git merge --ff-only origin/main || git merge --no-ff origin/main -m 'chore: merge main into beta'
+          git push origin HEAD:beta

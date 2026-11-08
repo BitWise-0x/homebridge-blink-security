@@ -7,6 +7,9 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: '/'
+    # Updates go through beta like any other change and reach main with the
+    # next promotion. Security updates ignore this and target main.
+    target-branch: 'beta'
     schedule:
       interval: weekly
       time: '04:00'
