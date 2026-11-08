@@ -151,7 +151,8 @@ export class DoorbellAccessory {
       this.config.enableAudio,
       this.config.hideRoutineLogs,
       this.config.audioFilter,
-      this.config.streamAddress
+      this.config.streamAddress,
+      this.config.liveViewTranscode
     );
 
     const controllerOptions: CameraControllerOptions = {

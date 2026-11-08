@@ -1,7 +1,7 @@
 {
   "displayName": "Blink Security",
   "name": "@jackietreeh0rn/homebridge-blink-security",
-  "version": "2.0.11",
+  "version": "2.1.0-beta.6",
   "description": "Homebridge plugin for Amazon Blink security cameras",
   "keywords": [
     "homebridge",
@@ -64,6 +64,7 @@
     "setup-log": "touch $(pwd)/test/hbConfig/homebridge.log && sed -i '' \"s|<log_file>|$(pwd)/test/hbConfig/homebridge.log|g\" $(pwd)/test/hbConfig/config.json"
   },
   "dependencies": {
+    "@eneris/push-receiver": "^4.4.0",
     "@homebridge/camera-utils": "^3.0.0",
     "axios": "^1.7.9",
     "ffmpeg-for-homebridge": "^2.1.1"

@@ -2,7 +2,7 @@
 
 <h1>
   <a href="https://github.com/BitWise-0x/homebridge-blink-security">
-    <img align="center" src="homebridge-ui/public/banner.svg" />
+    <img align="center" src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/banner.svg" />
   </a>
   <br />
   Homebridge Blink Security
@@ -25,12 +25,12 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 </span>
 <br><br>
 <p align="center">
-  <img src="homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home camera feeds and security status" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home camera feeds and security status" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
 </p>
 
-<br>
+---
 
 ## Supported Devices
 
@@ -56,7 +56,7 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 > plugin update. If a device does not appear in HomeKit at all, open an
 > issue with your startup log.
 
-<br>
+---
 
 ## Architecture
 
@@ -105,20 +105,20 @@ graph TD
     ffmpeg -->|"SRTP"| Home
 ```
 
-<br>
+---
 
 ## Features
 
-- **Live view**: IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras)
+- **Live view**: IMMI and RTSP streaming via ffmpeg with automatic keepalive (H.264 video, AAC-ELD audio on IMMI cameras). Optional re-encode of IMMI video with frequent keyframes for streams that stall in the Home app (`liveview-transcode`)
 - **Security system**: Arm/disarm per network, with optional manual arm switch and opt-in alarm triggering on motion (`enable-alarm-triggering`)
 - **Multi-network**: Supports multiple sync modules, each with independent arm/disarm
-- **Motion detection**: Motion events surfaced to HomeKit by polling the Blink cloud (configurable interval, with debounce). Blink has no public push API, so detection trails the Blink app's own notification by roughly the clip upload time plus one poll cycle
+- **Motion detection**: Motion events surfaced to HomeKit by polling the Blink cloud (configurable interval, with debounce). Detection trails the Blink app's own notification by roughly the clip upload time plus one poll cycle
 - **Local storage motion**: Motion notifications without a Blink subscription. Accounts with no cloud storage use clips saved to the Sync Module's USB drive instead (`local-storage-motion`)
 - **Motion enable/disable**: Per-camera switch to turn motion detection on or off
 - **Snapshots**: Thumbnail refresh while the Home app is requesting snapshots, at most once per `camera-thumbnail-refresh-seconds` for each camera with motion detection enabled (armed or disarmed), with caching and retry
 - **Battery**: Battery level and low-battery alerts (Outdoor/Indoor models)
 - **Temperature**: Ambient temperature sensor (Outdoor/Indoor models)
-- **Doorbell press**: Doorbell button presses raised as HomeKit doorbell events. HomeKit delivers the push notification; detection is via cloud polling, like motion
+- **Doorbell press**: Doorbell button presses raised as HomeKit doorbell events, so HomePods chime and the Home app notifies. Found by cloud polling, like motion, or within a second or two from Blink's push notifications with `enable-push-notifications`, which also works without a Blink subscription
 - **Privacy mode**: Per-camera switch that hides the camera's thumbnail in the Home app
 - **Night vision**: IR illuminator toggle (Outdoor/Indoor models)
 - **Clip recording**: Trigger a clip recording via momentary switch
@@ -130,7 +130,7 @@ graph TD
 - **Stale accessory cleanup**: Removes devices no longer on your Blink account
 - **Retry with backoff**: Automatic retry on network errors and rate limiting
 
-<br>
+---
 
 ## Installation
 
@@ -145,11 +145,11 @@ graph TD
 3. Configure your Blink credentials through the settings panel.
 
 <p align="center">
-  <img src="homebridge-ui/public/screenshot1.png" width="400" alt="Plugin settings screenshot" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot1.png" width="400" alt="Blink Security plugin settings in the Homebridge UI" />
 </p>
 
 <p align="center">
-  <img src="homebridge-ui/public/screenshot3.png" alt="Homebridge logs" />
+  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot3.png" alt="Homebridge log showing the push sign-in and a doorbell press delivered by push" />
 </p>
 
 ### Manual
@@ -168,7 +168,7 @@ graph TD
    homebridge -D
    ```
 
-<br>
+---
 
 ## 2FA Setup
 
@@ -179,7 +179,34 @@ Blink requires two-factor authentication on first login:
 3. Add the code to the `pin` field in config and restart Homebridge
 4. After successful verification, remove the `pin` field; the session is persisted
 
-<br>
+---
+
+## Push Notifications
+
+Doorbell presses normally reach HomeKit through cloud polling, after the clip uploads, and not at all without a Blink subscription. With `enable-push-notifications: true` the plugin receives Blink's push notifications, the channel the Blink app uses, so a press rings in HomeKit within a second or two, with or without a subscription.
+
+### Sign-in
+
+Blink sends these pushes only to clients of its Android app, so the plugin signs in a second Blink session once, through Blink's own page:
+
+1. Turn on **Push Notifications** and restart. The log prints a Blink sign-in link (repeated every 5 minutes until you sign in).
+2. Open the link on a computer that does not have the Blink app installed. Sign in and enter the code Blink sends by SMS or email.
+3. You land on a page titled "Unsupported Browser". That is the end of the sign-in. Copy the full address from the address bar; it starts with `https://applinks.blink.com/signin/callback?code=`.
+4. Paste it into **Push sign-in callback** right away and save. Blink's codes expire within minutes. No restart is needed: the log shows `Blink push: signed in` and `Blink push notifications connected` within a few seconds. The field can be cleared afterwards.
+
+> **Blink app installed on this computer?** The app, on a phone or a Mac, takes over the redirect and the address never shows. Use another computer, or open the browser's developer tools on the Network tab before signing in: the response that ends the sign-in carries the same address in its `redirect_uri` field.
+
+### How it works
+
+The plugin never sees your password for this session. It registers a Firebase Cloud Messaging token with the Blink app's public Firebase project and asks Blink to deliver the session's notifications to it. The account gets one more signed-in client, named "Homebridge Blink Security"; your phone keeps its own notifications. Polling keeps running, and a press seen both ways rings once.
+
+> **Unofficial protocol.** It was worked out by [ha-blink-live-events](https://github.com/CoreyHayward/ha-blink-live-events) and [ha-blink-instant-events](https://github.com/rohanjariwala03/ha-blink-instant-events). A Blink app update can break it; polling keeps working either way.
+
+### Turning it off
+
+Set `enable-push-notifications: false` and restart. The plugin signs the push client out of the Blink account and deletes its saved session. If Blink refuses the sign-out, the log says so; remove the client from the Blink app's account settings.
+
+---
 
 ## Configuration
 
@@ -198,6 +225,7 @@ Blink requires two-factor authentication on first login:
 | `hide-doorbells`                   | boolean | `false`    | Removes doorbells from HomeKit and stops looking for them. Rooms, automations, scenes, and custom names will not be restored if toggled back off                                                                                                                                                                                                                                                                            |
 | `enable-liveview`                  | boolean | `true`     | Enable IMMI live view streaming                                                                                                                                                                                                                                                                                                                                                                                             |
 | `enable-audio`                     | boolean | `false`    | Enable one-way audio in Live View. Also requires Audio Streaming in the Blink app under Device Settings → Privacy                                                                                                                                                                                                                                                                                                           |
+| `liveview-transcode`               | boolean | `false`    | Re-encode IMMI Live View video with a keyframe every 2 seconds at the resolution and bitrate HomeKit negotiated, instead of passing the camera's H.264 through. Fixes a Live View that spins after packet loss and quality changes that have no effect, at the cost of CPU on the Homebridge host (about half a core per stream on a Raspberry Pi)                                                                          |
 | `audio-filter`                     | string  | `""`       | Optional ffmpeg audio filtergraph for Live View audio, passed verbatim to `-af` (e.g. `volume=2.0,alimiter=limit=0.95` to double volume without clipping). Blank leaves audio unprocessed. Requires `enable-audio`                                                                                                                                                                                                          |
 | `stream-address`                   | string  | `""`       | Advanced. Local IPv4 address HomeKit should use as the camera address for Live View. Blank picks the interface on the same subnet as the Home controller (useful on Docker/VM or multi-interface hosts). Ignored with a warning if the address is not on this host                                                                                                                                                          |
 | `lv-save`                          | boolean | `false`    | Save Live View clips to Blink cloud                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -207,12 +235,17 @@ Blink requires two-factor authentication on first login:
 | `camera-status-polling-seconds`    | integer | `20`       | Camera status polling interval in seconds. Effective cadence rounds up to the next `blink-status-polling-seconds` tick                                                                                                                                                                                                                                                                                                      |
 | `camera-motion-polling-seconds`    | integer | `15`       | Motion detection polling interval in seconds. Effectively capped at `blink-status-polling-seconds`; a longer value would only add notification latency without reducing API load                                                                                                                                                                                                                                            |
 | `local-storage-motion`             | string  | `"auto"`   | Detect motion from Sync Module local (USB) storage clips on accounts without cloud clip storage. `"auto"` engages only while no cloud clips exist; `"always"` / `"never"` force it on or off. Local clips are checked every ~20s, clips already on the drive at startup are never replayed as motion, and doorbell button presses are reported as motion on this path (Blink's local manifest does not distinguish presses) |
+| `enable-push-notifications`        | boolean | `false`    | Receive Blink push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Registers this plugin as a notification client on the Blink account (see [Push Notifications](#push-notifications))                                                                                                                                                                       |
+| `push-sign-in-callback`            | string  |            | Only for the one-time push sign-in: the address of the page Blink lands on after signing in through the link in the log. Picked up on save; can be cleared once the log says signed in                                                                                                                                                                                                                                      |
 | `logging`                          | string  |            | `"quiet"` suppresses routine chatter (thumbnail refresh, reconfigure, clip recording, sleep). `"verbose"` or `"debug"` for extended logging                                                                                                                                                                                                                                                                                 |
 | `enable-startup-diagnostic`        | boolean | `false`    | Log diagnostic info on startup                                                                                                                                                                                                                                                                                                                                                                                              |
 
-<br>
+---
 
 ## Development
+
+<details>
+<summary>Building, testing and releasing</summary>
 
 ### Prerequisites
 
@@ -250,28 +283,9 @@ npm run format      # auto-fix formatting
 
 Commits must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary), enforced by pre-commit hooks via [commitlint](https://commitlint.js.org/) and [husky](https://typicode.github.io/husky/).
 
-### Dependency Updates
+</details>
 
-Dependabot opens grouped pull requests weekly, configured in [`.github/dependabot.yml`](./.github/dependabot.yml). Production and development dependencies are each split into a minor/patch group and a major group. The [Dependabot Auto Merge](./.github/workflows/dependabot-merge.yml) workflow enables auto-merge on patch and minor updates, so they land on their own once CI passes. Major updates stay open for manual review. Production updates are committed as `fix(deps)`, so merging one cuts a patch release; development updates are committed as `chore(deps-dev)` and do not release. Auto-merge is enabled with a token minted per run from the `bitwise-ci` GitHub App rather than the workflow's own `GITHUB_TOKEN`: merges made with `GITHUB_TOKEN` do not trigger push workflows, so the merged commit would land on `main` without Build or Release running.
-
-`prettier` is excluded from the development group. A Prettier minor can change formatting output, which fails the formatting check and would hold up every other update in the group. It gets its own pull request and usually needs an `npm run format` commit before it merges.
-
-Dependabot only tracks direct dependencies. Advisories against transitive packages, including ones bundled inside another package's tarball (for example `npm`, pulled in by `@semantic-release/npm`), show up as alerts without a pull request. Resolve those by raising the matching floor in the `overrides` block of `package.json` and regenerating the lockfile:
-
-```sh
-npm install --package-lock-only
-npm audit --omit=dev
-```
-
-`npm audit --omit=dev` only covers production dependencies, so a clean result can coexist with open development-scope alerts. Check the repository's Dependabot alerts page for those.
-
-### Releases
-
-Every push to `main` runs [semantic-release](https://semantic-release.gitbook.io/) with the `conventionalcommits` preset. `feat` commits cut a minor release, `fix` and `perf` a patch, and a `BREAKING CHANGE` footer a major. Other types (`docs`, `chore`, `ci`, `build`, `style`, `refactor`, `test`) do not release. Each release updates `CHANGELOG.md`, tags the commit, publishes to npm, and creates a GitHub release.
-
-Publishing requires `NPM_TOKEN`, a valid npm automation token, plus the `CI_APP_ID` and `CI_APP_PRIVATE_KEY` secrets of the `bitwise-ci` GitHub App. The Release workflow mints a short-lived App token with contents and pull-requests write access that semantic-release uses to push the changelog commit and tag and to create the GitHub release; the App is a bypass actor on the `main` ruleset, so that push is allowed. The Dependabot auto-merge workflow mints its token the same way. If the Release workflow fails with `EINVALIDNPMTOKEN`, generate a new npm token, update the secret, and re-run the failed job. `EINVALIDGHTOKEN` points at the App: check that it is still installed on the repository and that `CI_APP_PRIVATE_KEY` matches a current key. A run that stops with "local branch main is behind the remote one" published nothing; it happens when another commit reaches `main` mid-run, and the next successful run picks up every unreleased commit.
-
-<br>
+---
 
 ## Troubleshooting
 
@@ -285,13 +299,15 @@ Audio is opt-in. To enable it:
 2. Open the Blink app → Device Settings → Privacy → enable Audio Streaming for each camera
 3. Restart the child bridge
 
-If Audio Streaming is disabled in the Blink app, the camera sends malformed audio metadata that stalls the stream. That is why audio defaults to off.
+> **Why audio is off by default.** If Audio Streaming is disabled in the Blink app, the camera sends malformed audio metadata that stalls the stream.
 
 ### Live View shows "Not responding"
 
 If Live View spins and eventually shows "Not responding" in the Home app, the most common cause is audio being enabled in plugin config while Audio Streaming is disabled in the Blink app for that camera. Either enable Audio Streaming in the Blink app, or set `enable-audio: false` in plugin config.
 
 On a host with more than one network (Docker under a VM, a NAT address plus a bridged LAN address), Live View can also fail because HomeKit is given an address it cannot reach. The plugin picks the interface on the Home controller's subnet automatically. If that still picks the wrong one, set `stream-address` to the host's LAN IPv4 address.
+
+If Live View starts but shows a spinner after a few seconds, or looks the same whatever quality the Home app asks for, the camera's own keyframe interval is too long for HomeKit to recover from a lost packet. Set `liveview-transcode: true` to re-encode the stream with frequent keyframes; it costs CPU on the Homebridge host.
 
 ### No HomeKit notifications at all
 
@@ -305,15 +321,31 @@ Notification preferences live in iOS, not in the plugin, and they are per access
 
 Arm/disarm alerts have their own toggle: repeat the same steps on the security system tile.
 
-These settings reset whenever HomeKit sees an accessory as new: re-pairing the bridge, removing and re-adding a device, or migrating from another Blink plugin all create new accessories with notifications off, even though the Home app shows the same names. If notifications stop after one of those events, re-enable them.
+> **These settings reset on new accessories.** They reset whenever HomeKit sees an accessory as new: re-pairing the bridge, removing and re-adding a device, or migrating from another Blink plugin all create new accessories with notifications off, even though the Home app shows the same names. If notifications stop after one of those events, re-enable them.
 
 ### HomeKit notifications arrive later than the Blink app
 
-The Blink app is notified by Blink's private push service the moment a camera starts recording. There is no public push API, so the plugin can only discover an event by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided.
+The Blink app is notified by Blink's push service the moment a camera starts recording. The plugin discovers motion by polling the cloud media list, and a clip only appears there after it has finished recording and uploading. In practice HomeKit notifications land roughly 5 to 20 seconds behind the Blink app. Lowering `blink-status-polling-seconds` shaves a few seconds at the cost of more API requests; the upload time cannot be avoided. Doorbell presses avoid the delay with `enable-push-notifications` (see [Push Notifications](#push-notifications)).
 
 ### No motion notifications without a Blink subscription
 
 Accounts without a cloud storage plan have an empty cloud media list, so cloud polling finds nothing to report. Put a USB drive in the Sync Module and enable Local Storage in the Blink app; the plugin then detects motion from the sync module's local storage manifest instead. The startup log shows what the plugin sees, e.g. `Local storage: compatible=true, enabled=true, status=active`. The `local-storage-motion` option controls the fallback; the default `auto` engages it only while the cloud media list is empty.
+
+### Doorbell does not ring without a Blink subscription
+
+Polling finds presses in the cloud clip list, which stays empty without a subscription. Turn on [push notifications](#push-notifications).
+
+### Push sign-in opens the Blink app
+
+The Blink app, on a phone or a Mac, claims Blink's sign-in redirect. Sign in on a computer without the app, or follow the developer tools step in [Push Notifications](#push-notifications).
+
+### Push sign-in says the code expired
+
+Blink's codes last only minutes. Paste the address into **Push sign-in callback** right after copying it, and use the newest link in the log: a failed attempt prints a fresh one.
+
+### Doorbell stops ringing with push notifications on
+
+Look for `Blink push notifications connected` after the last start. If the log shows the sign-in prompt again, Blink ended the push session (a password change does this): sign in again. If it shows `unavailable, retrying`, the plugin reconnects on its own. Presses found by polling still ring in the meantime on accounts with a subscription.
 
 ### Motion notifications point at the Security System instead of the camera
 
@@ -336,13 +368,13 @@ Blink's authentication servers may reject login requests made through a VPN, ret
 
 If you run into issues, check the [Homebridge troubleshooting wiki](https://github.com/homebridge/homebridge/wiki/Basic-Troubleshooting) first. If the problem persists, [open an issue](https://github.com/BitWise-0x/homebridge-blink-security/issues/new/choose) with as much detail as possible.
 
-<br>
+---
 
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature requests, and code contributions.
 
-<br>
+---
 
 ## Useful Resources
 
@@ -353,7 +385,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 - [Homebridge Developer Documentation](https://developers.homebridge.io/)
 - [Apple HomeKit Documentation](https://developer.apple.com/documentation/homekit/)
 
-<br>
+---
 
 ## License
 
@@ -361,7 +393,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 
 <!-- [![FOSSA Status](https://app.fossa.com/api/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security.svg?type=large&issueType=license)](https://app.fossa.com/projects/custom%2B56237%2Fgithub.com%2FBitWise-0x%2Fhomebridge-blink-security?ref=badge_large&issueType=license) -->
 
-<br>
+---
 
 ## Disclaimer
 

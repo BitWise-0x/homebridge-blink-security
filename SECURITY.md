@@ -11,12 +11,11 @@ The following versions are supported
 
 ## Reporting a Vulnerability
 
-If you believe you have found a security vulnerability in of my repositories, please report it to me through coordinated
-disclosure.
+If you believe you have found a security vulnerability in this plugin, please report it through coordinated disclosure.
 
 Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.
 
-Instead, please send an email to security@jaredbrown.io.
+Instead, please send an email to security@bitwise0x.com.
 
 Please include as much of the information listed below as you can to help me better understand and resolve the issue:
 
@@ -30,4 +29,4 @@ Please include as much of the information listed below as you can to help me bet
 
 ## Dependency Advisories
 
-Dependabot alerts on this repository are triaged by scope. Advisories against production dependencies affect the published plugin and are fixed and released as a priority. Advisories against development-only dependencies (the build, lint, and release toolchain) never ship to users; they are still resolved, usually by raising the matching floor in the `overrides` block of `package.json`, but they are not treated as plugin vulnerabilities. See [Dependency Updates](README.md#dependency-updates) for the mechanics.
+Advisories against production dependencies affect the published plugin and are fixed and released as a priority. Advisories against development-only dependencies (the build, lint and release toolchain) never ship to users and are not treated as plugin vulnerabilities.

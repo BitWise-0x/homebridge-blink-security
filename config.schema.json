@@ -141,6 +141,12 @@
         "description": "Enable one-way audio in HomeKit Live View. Requires Audio Streaming to also be enabled in the Blink app under Device Settings → Privacy.",
         "type": "boolean"
       },
+      "liveview-transcode": {
+        "title": "Re-encode Live View video",
+        "default": false,
+        "description": "Re-encode the camera video with frequent keyframes at the resolution and bitrate HomeKit requests. Fixes Live View stalling (spinner) and ignored quality changes, at the cost of CPU on the Homebridge host.",
+        "type": "boolean"
+      },
       "audio-filter": {
         "title": "Audio Filter (advanced)",
         "type": "string",
@@ -163,6 +169,21 @@
           { "title": "Always", "enum": ["always"] },
           { "title": "Never", "enum": ["never"] }
         ]
+      },
+      "enable-push-notifications": {
+        "title": "Push Notifications (doorbell presses)",
+        "type": "boolean",
+        "default": false,
+        "description": "Receive Blink's push notifications so doorbell presses reach HomeKit instantly, including on accounts without a Blink subscription. Needs a one-time sign-in: open the Blink link from the plugin log on a computer without the Blink app, then paste the address of the page you land on into the field below and save. Unofficial: Blink may change this protocol."
+      },
+      "push-sign-in-callback": {
+        "title": "Push sign-in callback",
+        "type": "string",
+        "placeholder": "https://applinks.blink.com/signin/callback?code=...",
+        "description": "Only for the one-time push sign-in: the full address of the page Blink lands on after signing in through the link in the plugin log. Used as soon as you save; Blink's codes expire within minutes. Can be cleared once the log says signed in.",
+        "condition": {
+          "functionBody": "return model['enable-push-notifications'] === true;"
+        }
       }
     },
     "required": ["username", "password"]
@@ -193,6 +214,7 @@
         "hide-temperature-sensor",
         "enable-liveview",
         "enable-audio",
+        "liveview-transcode",
         "lv-save"
       ]
     },
@@ -207,6 +229,8 @@
         "camera-status-polling-seconds",
         "camera-motion-polling-seconds",
         "local-storage-motion",
+        "enable-push-notifications",
+        "push-sign-in-callback",
         "audio-filter",
         "stream-address",
         "logging",
