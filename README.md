@@ -25,8 +25,6 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 </span>
 <br><br>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot4.jpeg" width="320" alt="Apple Home camera feeds and security status" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="https://raw.githubusercontent.com/BitWise-0x/homebridge-blink-security/main/homebridge-ui/public/screenshot5.jpeg" width="280" alt="Apple Home security system arm/disarm" />
 </p>
 
