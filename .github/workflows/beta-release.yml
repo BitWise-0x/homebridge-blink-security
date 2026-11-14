@@ -51,7 +51,7 @@ jobs:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues
       pull-requests: write # to be able to comment on released pull requests
-      id-token: write # to enable use of OIDC for npm provenance
+      id-token: write # npm trusted publishing (OIDC) and provenance
     steps:
       # Short-lived token from the bitwise-ci App (on this repo's ruleset bypass),
       # so semantic-release can push the changelog commit + tag to protected main
@@ -83,6 +83,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.apptoken.outputs.token }}
           GH_TOKEN: ${{ steps.apptoken.outputs.token }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm run semantic-release
