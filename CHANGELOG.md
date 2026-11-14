@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.2](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.1...v2.1.2) (2026-11-14)
+
+### Bug Fixes
+
+* **deps:** bump axios ([9ec4d35](https://github.com/BitWise-0x/homebridge-blink-security/commit/9ec4d35e29b4b123e9005aabdda8dceab39e4e93))
+
 ## [2.1.2-beta.1](https://github.com/BitWise-0x/homebridge-blink-security/compare/v2.1.1...v2.1.2-beta.1) (2026-11-13)
 
 ### Bug Fixes
