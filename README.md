@@ -62,7 +62,7 @@ The most comprehensive <a href="https://homebridge.io">Homebridge</a> plugin for
 graph TD
     Home["🏠 Apple Home"]
 
-    subgraph Homebridge
+    subgraph hb["Homebridge"]
         platform["<b>BlinkSecurityPlatform</b><br>DynamicPlatformPlugin"]
         acc_sec["<b>SecuritySystem</b><br>arm / disarm per network"]
         acc_cam["<b>Camera</b><br>live view · snapshots<br>motion · battery · temp"]
@@ -77,7 +77,7 @@ graph TD
         end
     end
 
-    subgraph Blink Cloud
+    subgraph cloud["Blink Cloud"]
         auth["<b>OAuth 2.0 + PKCE</b><br>+ 2FA PIN · session persist"]
         api["<b>Blink REST API</b><br>immedia-semi.com"]
         immi_srv["<b>IMMI Server</b><br>TLS :443"]
@@ -101,6 +101,12 @@ graph TD
     rtsp_proxy -->|"TLS"| rtsp_srv
     immi_proxy & rtsp_proxy -->|"MPEG-TS"| ffmpeg
     ffmpeg -->|"SRTP"| Home
+    classDef default fill:#efb146,stroke:#a96a19,stroke-width:2px,color:#0c0f0e
+    classDef quiet fill:#1b221f,stroke:#2e3733,stroke-width:2px,color:#e7ece8
+    linkStyle default stroke:#efb146,stroke-width:2px
+    class Home,ffmpeg,auth,api,immi_srv,rtsp_srv quiet
+    style hb fill:transparent,stroke:#a96a19,stroke-width:1px,stroke-dasharray:5 4,color:#a96a19
+    style cloud fill:transparent,stroke:#a96a19,stroke-width:1px,stroke-dasharray:5 4,color:#a96a19
 ```
 
 ---
@@ -400,3 +406,11 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on bug reports, feature 
 ## Disclaimer
 
 This project is not endorsed by, directly affiliated with, maintained, authorized, or sponsored by Amazon.com, Inc., Immedia Semiconductor, or Apple Inc. All product and company names are the registered trademarks of their original owners. The use of any trade name or trademark is for identification and reference purposes only and does not imply any association with the trademark holder of their product brand.
+
+<br>
+
+---
+
+<p align="center">
+  <sub>A <a href="https://bitwise0x.com"><b>BitWise</b></a> product</sub>
+</p>
