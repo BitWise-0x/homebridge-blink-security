@@ -69,7 +69,7 @@ graph TD
         acc_door["<b>Doorbell</b><br>press notification<br>+ camera features"]
         acc_siren["<b>Siren</b><br>on / off"]
 
-        subgraph Streaming Pipeline
+        subgraph pipe["Streaming Pipeline"]
             delegate["<b>CameraDelegate</b><br>stream lifecycle"]
             immi_proxy["<b>ImmiTunnel</b><br>MPEG-TS over TLS"]
             rtsp_proxy["<b>RtspToH264Proxy</b><br>RTSP de-frame → MPEG-TS"]
@@ -107,6 +107,7 @@ graph TD
     class Home,ffmpeg,auth,api,immi_srv,rtsp_srv quiet
     style hb fill:transparent,stroke:#a96a19,stroke-width:1px,stroke-dasharray:5 4,color:#a96a19
     style cloud fill:transparent,stroke:#a96a19,stroke-width:1px,stroke-dasharray:5 4,color:#a96a19
+    style pipe fill:transparent,stroke:#a96a19,stroke-width:1px,stroke-dasharray:5 4,color:#a96a19
 ```
 
 ---
