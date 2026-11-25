@@ -14,11 +14,11 @@ updates:
       interval: weekly
       time: '04:00'
       timezone: 'America/New_York'
-    # Production bumps ship to users, so they are committed as fix(deps) and
-    # semantic-release cuts a patch. Tooling bumps stay chore and do not release.
+    # All bumps are committed as chore(deps) and do not cut a release on their
+    # own. They ship with the next fix or feat, or with an explicit fix(deps)
+    # commit on beta. This also covers security updates that target main.
     commit-message:
-      prefix: 'fix'
-      prefix-development: 'chore'
+      prefix: 'chore'
       include: 'scope'
     groups:
       production-dependencies:
